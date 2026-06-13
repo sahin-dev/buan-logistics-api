@@ -1,0 +1,104 @@
+model User {
+    id  String @id @default(uuid())
+    email String @unique
+    password String?
+    provider String @default("local")
+    profile UserProfile? 
+    businessProfile BusinessProfile?
+    coporatePartnerProfile  CorporatePartnerProfile?
+    hubProviderProfile  HubProviderProfile?
+    tier Tier @default(T1)
+    role Role @default(USER)
+
+    upgradeApplication UpgradeApplication[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("users")
+}
+
+
+model UserProfile {
+    id String @id @default(uuid())
+    avatar String?
+    userId String @unique 
+    firstName String
+    lastName String
+    location String?
+    phone String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BusinessProfile {
+    id  String @id @default(uuid())
+    userId      String @unique
+    autorizedPersonFullName  String
+    authorizedPersonTitle  String
+    companyName  String
+    tradingName  String
+    Reg_no       String
+    country      String
+    address      String
+    email        String
+    phone        String
+    website      String
+    type         String
+
+    status    ApplicationStatus
+
+    user  User @relation(references: [id], fields: [userId], onDelete: Cascade)
+    operation_mode  OperationMode
+    createdAt  DateTime
+    updatedAt  DateTime
+
+    @@map("business_profiles")
+
+}
+
+model CorporatePartnerProfile {
+    id  String @id @default(uuid())
+    userId  String @unique
+
+    user User  @relation(fields: [userId], references: [id])
+
+}
+
+model HubProviderProfile {
+    id String @id @default(uuid())
+    userId  String @unique
+
+    user User @relation(fields: [userId], references: [id])
+}
+
+model UpgradeApplication {
+    id String @id @default(uuid())
+    userId  String
+
+    user User @relation(fields: [userId], references: [id])
+}
+
+enum Tier {
+    T1
+    T2
+    T3
+}
+
+enum Role {
+    USER
+    ADMIN
+    CORPORATE_PARTNER
+    HUB_PROIVDER
+}
+
+enum ApplicationStatus {
+    Pending
+    Accepted
+    Rejected
+}
+
+enum OperationMode {
+    Offline
+    Online
+    Both
+}

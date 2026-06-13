@@ -1,0 +1,24 @@
+model Invoice {
+    id String @id @default(uuid())
+    invoice_number String @unique
+    order_id String
+    amount Float
+    status InvoiceStatus
+    issued_at DateTime
+    due_at DateTime
+    shipmentId String
+    discount_percent Float?
+    shipment Shipment @relation(fields: [shipmentId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("invoices")
+    @@index([id, invoice_number])
+}
+
+enum InvoiceStatus {
+    PENDING
+    PAID
+    OVERDUE
+    CANCELLED
+}

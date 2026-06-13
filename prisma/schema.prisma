@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat  = "cjs"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model HubProviderApplication {
+  
+  id  String @id @default(uuid())
+  shopName   String
+  address   String
+  landmark  String
+  cityOrState String
+  contact  String
+  email   String
+  cctvAvailable  Boolean
+  ownerName  String
+  ownerEmail  String
+  prefferedContactMethod String
+  operatingDays  String[]
+
+  email_active_window_from  DateTime
+  email_active_window_to   DateTime
+  daily_minimum_staff   Int
+  daily_maximum_staff   Int
+  daily_foot_traffic    String
+  handledDeliveryServiceBefore  Boolean
+  atLeastSixMonthCommitted  Boolean
+  comments  String?
+
+  image_urls  String[]
+
+  status  ApplicationStatus
+  rejected_at  DateTime?
+  accepted_at  DateTime?
+  rejection_notes  String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime @updatedAt
+  @@map("hubprovider_applications")
+}

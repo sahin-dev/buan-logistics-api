@@ -1,0 +1,45 @@
+model Shipment {
+    id String @id @default(uuid())
+    tracking_number String @unique
+    origin String
+    destination String
+    weight Float
+    shipped_at DateTime
+    delivered_at DateTime?
+    timeline ShipmentTimeline[]
+    current_status ShipmentStatus
+    type ShipmentType
+    invoice Invoice[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("shipments")
+    @@index([id, tracking_number])
+}
+
+
+model ShipmentTimeline {
+    id String @id @default(uuid())
+    shipmentId String
+    status ShipmentStatus
+    timestamp DateTime
+    order Int
+    shipment Shipment @relation(fields: [shipmentId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("shipment_timelines")
+    @@index([id, shipmentId])
+}
+
+enum ShipmentStatus {
+    PENDING
+    IN_TRANSIT
+    DELIVERED
+    CANCELLED
+}
+
+enum ShipmentType {
+    STANDARD
+    EXPRESS
+    OVERNIGHT
+}
