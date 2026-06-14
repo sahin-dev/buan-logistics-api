@@ -28,7 +28,7 @@ export class FileUploadService {
     const filePath = path.join(this.uploadDir, uniqueName);
 
     try {
-      fs.writeFileSync(filePath, file.buffer);
+      await fs.promises.writeFile(filePath, file.buffer);
     } catch (error) {
       throw new BadRequestException('Failed to save file.');
     }
@@ -54,7 +54,7 @@ export class FileUploadService {
     }
 
     try {
-      fs.unlinkSync(absolutePath);
+      await fs.promises.unlink(absolutePath);
     } catch (error) {
       throw new BadRequestException('Failed to delete file.');
     }

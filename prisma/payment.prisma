@@ -1,0 +1,37 @@
+model Payment {
+    id            String        @id @default(uuid())
+    invoiceId     String
+    invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+    amount        Float
+    status        PaymentStatus @default(PENDING)
+    method        PaymentMethod
+    transactionId String?
+    paymentDate   DateTime      @default(now())
+    installmentNo Int?          // To track which installment (e.g. 1, 2)
+
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @updatedAt
+
+    @@map("payments")
+    @@index([id, invoiceId])
+}
+
+enum PaymentType {
+    INSTALLMENT
+    FULL
+}
+
+enum PaymentStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    REFUNDED
+}
+
+enum PaymentMethod {
+    CREDIT_CARD
+    PAYPAL
+    BANK_TRANSFER
+    CASH
+    DIRECT_DEBIT
+}

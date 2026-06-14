@@ -1,0 +1,49 @@
+model Branch {
+    id        String      @id @default(uuid())
+    name      String
+    address   String
+    city      String
+    hubs      Hub[]
+    shipments Shipment[]  @relation("BranchShipments")
+    containers Container[] @relation("BranchContainers")
+    createdAt DateTime    @default(now())
+    updatedAt DateTime    @updatedAt
+
+    @@map("branches")
+}
+
+model Hub {
+    id                   String          @id @default(uuid())
+    name                 String
+    address              String
+    branchId             String
+    hubProviderId        String?         @unique
+    commissionPerPackage Float           @default(0.0)
+    branch               Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+    hubProvider          User?           @relation(fields: [hubProviderId], references: [id])
+    shipments            Shipment[]      @relation("HubShipments")
+    commissions          HubCommission[]
+    createdAt            DateTime        @default(now())
+    updatedAt            DateTime        @updatedAt
+
+    @@map("hubs")
+}
+
+model HubCommission {
+    id              String           @id @default(uuid())
+    hubId           String
+    hub             Hub              @relation(fields: [hubId], references: [id], onDelete: Cascade)
+    shipmentId      String           @unique
+    shipment        Shipment         @relation("HubShipmentCommission", fields: [shipmentId], references: [id], onDelete: Cascade)
+    amount          Float
+    status          CommissionStatus @default(PENDING)
+    paidAt          DateTime?
+    createdAt       DateTime         @default(now())
+
+    @@map("hub_commissions")
+}
+
+enum CommissionStatus {
+    PENDING
+    PAID
+}

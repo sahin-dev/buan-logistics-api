@@ -1,0 +1,20 @@
+model Reward {
+    id         String   @id @default(uuid())
+    userId     String
+    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    shipmentId String?  @unique
+    shipment   Shipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    source     RewardSource @default(SHIPMENT)
+    description String?
+    points     Float    @default(10.0) // configurable default points
+    createdAt  DateTime @default(now())
+
+    @@map("rewards")
+}
+
+enum RewardSource {
+    SHIPMENT
+    REFERRAL
+    LOYALTY_BONUS
+    REDEEMED
+}

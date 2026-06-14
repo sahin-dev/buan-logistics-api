@@ -6,11 +6,20 @@ model User {
     profile UserProfile? 
     businessProfile BusinessProfile?
     coporatePartnerProfile  CorporatePartnerProfile?
+    coporatePartnerApplication CorporatePartnerApplication?
     hubProviderProfile  HubProviderProfile?
     tier Tier @default(T1)
     role Role @default(USER)
 
     upgradeApplication UpgradeApplication[]
+    sentShipments      Shipment[]           @relation("SentShipments")
+    invoices           Invoice[]
+    rewards            Reward[]
+    hub                Hub?
+    passwordResetTokens PasswordResetToken[]
+    notifications       Notification[]
+    referrals           Referral[]           @relation("Referrals")
+    referredBy          Referral?            @relation("ReferredBy")
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -26,6 +35,7 @@ model UserProfile {
     lastName String
     location String?
     phone String?
+    address String?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -57,11 +67,61 @@ model BusinessProfile {
 }
 
 model CorporatePartnerProfile {
-    id  String @id @default(uuid())
-    userId  String @unique
+    id                      String            @id @default(uuid())
+    userId                  String            @unique
+    companyName             String
+    tradingName             String?
+    regNo                   String
+    country                 String
+    address                 String
+    yearsInOperation        String
+    contactName             String
+    contactPosition         String
+    contactPhone            String
+    contactEmail            String
+    website                 String?
+    businessNature          String[]
+    countriesOperateFrom    String
+    countriesShipTo         String
+    cargoTypes              String[]
+    estimatedMonthlyVolume  String
+    servicesRequired        String
+    rateCardUrl             String?
+    billingCycle            BillingCycle      @default(MONTHLY)
 
-    user User  @relation(fields: [userId], references: [id])
+    user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("corporate_partner_profiles")
+}
 
+model CorporatePartnerApplication {
+    id                      String            @id @default(uuid())
+    userId                  String            @unique
+    companyName             String
+    tradingName             String?
+    regNo                   String
+    country                 String
+    address                 String
+    yearsInOperation        String
+    contactName             String
+    contactPosition         String
+    contactPhone            String
+    contactEmail            String
+    website                 String?
+    businessNature          String[]
+    countriesOperateFrom    String
+    countriesShipTo         String
+    cargoTypes              String[]
+    estimatedMonthlyVolume  String
+    servicesRequired        String
+    status                  ApplicationStatus @default(Pending)
+    rejectionNotes          String?
+    createdAt               DateTime          @default(now())
+    updatedAt               DateTime          @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("corporate_partner_applications")
 }
 
 model HubProviderProfile {
@@ -72,10 +132,43 @@ model HubProviderProfile {
 }
 
 model UpgradeApplication {
-    id String @id @default(uuid())
-    userId  String
+    id         String            @id @default(uuid())
+    userId     String
+    targetTier Tier
+    status     ApplicationStatus @default(Pending)
+    notes      String?
+    createdAt  DateTime          @default(now())
+    updatedAt  DateTime          @updatedAt
 
-    user User @relation(fields: [userId], references: [id])
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+    id              String         @id @default(uuid())
+    referrerUserId  String
+    referredEmail   String
+    referredUserId  String?        @unique
+    referralCode    String         @unique
+    status          ReferralStatus @default(PENDING)
+    rewardPoints    Float          @default(0.0)
+    createdAt       DateTime       @default(now())
+    updatedAt       DateTime       @updatedAt
+
+    referrer     User  @relation("Referrals", fields: [referrerUserId], references: [id], onDelete: Cascade)
+    referredUser User? @relation("ReferredBy", fields: [referredUserId], references: [id], onDelete: Cascade)
+    @@map("referrals")
+}
+
+enum ReferralStatus {
+    PENDING
+    COMPLETED
+    EXPIRED
+}
+
+enum BillingCycle {
+    WEEKLY
+    BIWEEKLY
+    MONTHLY
 }
 
 enum Tier {
@@ -89,6 +182,7 @@ enum Role {
     ADMIN
     CORPORATE_PARTNER
     HUB_PROIVDER
+    BRANCH
 }
 
 enum ApplicationStatus {
@@ -101,4 +195,16 @@ enum OperationMode {
     Offline
     Online
     Both
+}
+
+model PasswordResetToken {
+    id        String   @id @default(uuid())
+    userId    String
+    token     String   @unique
+    expiresAt DateTime
+    used      Boolean  @default(false)
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("password_reset_tokens")
 }

@@ -4,6 +4,7 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { PasswordHasher } from "./utils/PasswordHasher";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
+import { SmtpProvider } from "src/common/providers/smtp.provider";
 
 /**
  * Authentication Module
@@ -19,7 +20,7 @@ import { AuthController } from "./auth.controller";
         }),
     ],
     controllers: [AuthController],
-    providers: [AuthService, PasswordHasher],
-    exports: [AuthService, PasswordHasher, JwtModule],
+    providers: [AuthService, PasswordHasher, SmtpProvider],
+    exports: [AuthService, PasswordHasher, JwtModule, SmtpProvider],
 })
 export class AuthModule {}

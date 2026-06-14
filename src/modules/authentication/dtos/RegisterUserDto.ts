@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsEmail, IsNotEmpty, IsString, IsStrongPassword } from "class-validator"
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsStrongPassword } from "class-validator"
 
 export class RegisterUserDto {
 
@@ -39,4 +39,12 @@ export class RegisterUserDto {
         example:"password1234"
     })
     confirmPassword:string
+
+    @IsString()
+    @IsOptional()
+    @ApiProperty({
+        example: "REF-123456",
+        required: false
+    })
+    referralCode?: string
 }

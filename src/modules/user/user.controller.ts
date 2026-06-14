@@ -7,14 +7,26 @@ import {
     Post,
     Put,
     Patch,
+    Query,
     UseInterceptors,
     UploadedFile,
+    UseGuards,
+    Request,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth } from "@nestjs/swagger";
 import { UserService } from "./user.service";
 import { CreateUserDto } from "./dtos/create-user.dto";
 import { UpdateUserDto } from "./dtos/update-user.dto";
+import { UpdateProfileDto } from "./dtos/update-profile.dto";
+import { ApplyUpgradeDto } from "./dtos/apply-upgrade.dto";
+import { HubProviderApplicationDto } from "./dtos/hub-provider-application.dto";
+import { CreateCorporateApplicationDto } from "./dtos/create-corporate-application.dto";
+import { JwtAuthGuard } from "src/common/guards/auth.guard";
+import { RolesGuard } from "src/common/guards/roles.guard";
+import { Roles } from "src/common/decorators/roles.decorator";
+import { Role, ApplicationStatus } from "generated/prisma/enums";
+import { PaginationQueryDto } from "src/common/dtos/pagination-query.dto";
 
 @ApiTags("Users")
 @Controller("users")
@@ -26,14 +38,37 @@ export class UserController {
      * @returns List of all users
      */
     @Get()
-    @ApiOperation({ summary: "Get all users" })
+    @ApiOperation({ summary: "Get all users (paginated, supports ?page=1&limit=10&search=keyword)" })
     @ApiResponse({
         status: 200,
-        description: "List of users retrieved successfully",
+        description: "Paginated list of users retrieved successfully",
     })
-    
-    async getAllUsers() {
-        return this.userService.getAllUsers();
+    async getAllUsers(@Query() query: PaginationQueryDto) {
+        return this.userService.getAllUsers(query);
+    }
+
+    /**
+     * Update the authenticated user's own profile
+     * Supports avatar upload along with text fields
+     */
+    @Patch("me")
+    @UseGuards(JwtAuthGuard)
+    @UseInterceptors(FileInterceptor("avatar"))
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update own profile (avatar, name, phone, address)" })
+    @ApiConsumes("multipart/form-data")
+    @ApiResponse({
+        status: 200,
+        description: "Profile updated successfully",
+    })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async updateMyProfile(
+        @Request() req: any,
+        @Body() dto: UpdateProfileDto,
+        @UploadedFile() file?: any,
+    ) {
+        const userId = req.payload.userId;
+        return this.userService.updateMyProfile(userId, dto, file);
     }
 
     /**
@@ -95,7 +130,7 @@ export class UserController {
     @ApiOperation({ summary: "Delete a user" })
     @ApiResponse({
         status: 200,
-        description: "User deleted successfully",
+        description: "Delete a user",
     })
     @ApiResponse({ status: 404, description: "User not found" })
     async deleteUser(@Param("id") id: string) {
@@ -136,5 +171,97 @@ export class UserController {
     @ApiResponse({ status: 404, description: "User not found" })
     async uploadAvatar(@Param("id") id: string, @UploadedFile() file: any) {
         return this.userService.uploadAvatar(id, file);
+    }
+
+    @Post("apply-upgrade")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Apply for a tier upgrade (T1 -> T2/T3)" })
+    async applyUpgrade(@Request() req: any, @Body() dto: ApplyUpgradeDto) {
+        const userId = req.payload.userId;
+        return this.userService.applyForUpgrade(userId, dto.targetTier);
+    }
+
+    @Post("apply-hub-provider")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Apply to become a hub provider" })
+    async applyHubProvider(@Body() dto: HubProviderApplicationDto) {
+        return this.userService.applyForHubProvider(dto);
+    }
+
+    @Post("apply-corporate-partner")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Apply to become a corporate partner / business partner" })
+    async applyCorporatePartner(@Request() req: any, @Body() dto: CreateCorporateApplicationDto) {
+        const userId = req.payload.userId;
+        return this.userService.applyForCorporatePartner(userId, dto);
+    }
+
+    @Get("upgrade-applications")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get all tier upgrade applications (Admin only) — supports ?page=1&limit=10" })
+    async getUpgradeApplications(@Query() query: PaginationQueryDto) {
+        return this.userService.getUpgradeApplications(query);
+    }
+
+    @Get("hub-provider-applications")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get all hub provider applications (Admin only) — supports ?page=1&limit=10" })
+    async getHubProviderApplications(@Query() query: PaginationQueryDto) {
+        return this.userService.getHubProviderApplications(query);
+    }
+
+    @Get("corporate-applications")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get all corporate partner applications (Admin only) — supports ?page=1&limit=10" })
+    async getCorporatePartnerApplications(@Query() query: PaginationQueryDto) {
+        return this.userService.getCorporatePartnerApplications(query);
+    }
+
+    @Put("upgrade-applications/:id/review")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Review upgrade application (Admin only)" })
+    async reviewUpgradeApplication(
+        @Param("id") id: string,
+        @Body("status") status: ApplicationStatus,
+        @Body("notes") notes?: string,
+    ) {
+        return this.userService.reviewUpgradeApplication(id, status, notes);
+    }
+
+    @Put("hub-provider-applications/:id/review")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Review hub provider application (Admin only)" })
+    async reviewHubProviderApplication(
+        @Param("id") id: string,
+        @Body("status") status: ApplicationStatus,
+        @Body("notes") notes?: string,
+    ) {
+        return this.userService.reviewHubProviderApplication(id, status, notes);
+    }
+
+    @Put("corporate-applications/:id/review")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Review corporate partner application (Admin only)" })
+    async reviewCorporatePartnerApplication(
+        @Param("id") id: string,
+        @Body("status") status: ApplicationStatus,
+        @Body("notes") notes?: string,
+    ) {
+        return this.userService.reviewCorporatePartnerApplication(id, status, notes);
     }
 }
