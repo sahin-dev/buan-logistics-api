@@ -8,15 +8,23 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableVersioning({
-    type:VersioningType.URI,
-    prefix:'v',
-    defaultVersion:'1'
+    type: VersioningType.URI,
+    prefix: 'v',
+    defaultVersion: '1'
   })
 
-   const config = new DocumentBuilder()
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+  })
+
+  const config = new DocumentBuilder()
     .setTitle('Buan Logistics API')
     .setDescription('Buan Logistics API description')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);

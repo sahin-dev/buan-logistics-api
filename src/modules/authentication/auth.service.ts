@@ -20,7 +20,7 @@ export class AuthService {
         private readonly jwtService: JwtService,
         private readonly smtpProvider: SmtpProvider,
         private readonly eventEmitter: EventEmitter2,
-    ) {}
+    ) { }
 
     /**
      * Register a new user
@@ -91,7 +91,7 @@ export class AuthService {
      * @returns AuthResponseDto with token and user info
      */
     async signin(signInUserDto: SignInUserDto): Promise<AuthResponseDto> {
-        const { email, password, role } = signInUserDto;
+        const { email, password } = signInUserDto;
 
         try {
             // Find user by email
@@ -116,10 +116,10 @@ export class AuthService {
                 throw new UnauthorizedException("Invalid email or password");
             }
 
-            // Verify role matches
-            if (user.role.toLowerCase() !== role.toLowerCase()) {
-                throw new UnauthorizedException("Invalid role");
-            }
+            // // Verify role matches
+            // if (user.role.toLowerCase() !== role.toLowerCase()) {
+            //     throw new UnauthorizedException("Invalid role");
+            // }
 
             // Generate JWT token
             const token = this.generateToken(user.id, user.role);

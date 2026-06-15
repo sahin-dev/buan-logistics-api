@@ -27,11 +27,12 @@ import { RolesGuard } from "src/common/guards/roles.guard";
 import { Roles } from "src/common/decorators/roles.decorator";
 import { Role, ApplicationStatus } from "generated/prisma/enums";
 import { PaginationQueryDto } from "src/common/dtos/pagination-query.dto";
+import { ReviewApplicationDto } from "./dtos/review-application.dto";
 
 @ApiTags("Users")
 @Controller("users")
 export class UserController {
-    constructor(private readonly userService: UserService) {}
+    constructor(private readonly userService: UserService) { }
 
     /**
      * Get all users
@@ -233,10 +234,9 @@ export class UserController {
     @ApiOperation({ summary: "Review upgrade application (Admin only)" })
     async reviewUpgradeApplication(
         @Param("id") id: string,
-        @Body("status") status: ApplicationStatus,
-        @Body("notes") notes?: string,
+        @Body() reviewApplicationDto: ReviewApplicationDto
     ) {
-        return this.userService.reviewUpgradeApplication(id, status, notes);
+        return this.userService.reviewUpgradeApplication(id, reviewApplicationDto.status, reviewApplicationDto.notes);
     }
 
     @Put("hub-provider-applications/:id/review")
@@ -246,10 +246,9 @@ export class UserController {
     @ApiOperation({ summary: "Review hub provider application (Admin only)" })
     async reviewHubProviderApplication(
         @Param("id") id: string,
-        @Body("status") status: ApplicationStatus,
-        @Body("notes") notes?: string,
+        @Body() reviewApplicationDto: ReviewApplicationDto
     ) {
-        return this.userService.reviewHubProviderApplication(id, status, notes);
+        return this.userService.reviewHubProviderApplication(id, reviewApplicationDto.status, reviewApplicationDto.notes);
     }
 
     @Put("corporate-applications/:id/review")
@@ -259,9 +258,8 @@ export class UserController {
     @ApiOperation({ summary: "Review corporate partner application (Admin only)" })
     async reviewCorporatePartnerApplication(
         @Param("id") id: string,
-        @Body("status") status: ApplicationStatus,
-        @Body("notes") notes?: string,
+        @Body() reviewApplicationDto: ReviewApplicationDto
     ) {
-        return this.userService.reviewCorporatePartnerApplication(id, status, notes);
+        return this.userService.reviewCorporatePartnerApplication(id, reviewApplicationDto.status, reviewApplicationDto.notes);
     }
 }
