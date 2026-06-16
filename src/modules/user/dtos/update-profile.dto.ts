@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsPhoneNumber } from "class-validator";
+import { IsString, IsOptional } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class UpdateProfileDto {
@@ -37,4 +37,13 @@ export class UpdateProfileDto {
         required: false,
     })
     address?: string;
+
+    @IsOptional()
+    @ApiProperty({
+        type: "string",
+        format: "binary",
+        description: "Avatar image file (JPEG, PNG, GIF, WebP — max 5 MB)",
+        required: false,
+    })
+    avatar?: any;
 }

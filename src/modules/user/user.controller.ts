@@ -14,7 +14,7 @@ import {
     Request,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { UserService } from "./user.service";
 import { CreateUserDto } from "./dtos/create-user.dto";
 import { UpdateUserDto } from "./dtos/update-user.dto";
@@ -28,6 +28,7 @@ import { Roles } from "src/common/decorators/roles.decorator";
 import { Role, ApplicationStatus } from "generated/prisma/enums";
 import { PaginationQueryDto } from "src/common/dtos/pagination-query.dto";
 import { ReviewApplicationDto } from "./dtos/review-application.dto";
+import { mapUserResponse } from "src/common/utils/role-mapper.util";
 
 @ApiTags("Users")
 @Controller("users")
@@ -45,7 +46,8 @@ export class UserController {
         description: "Paginated list of users retrieved successfully",
     })
     async getAllUsers(@Query() query: PaginationQueryDto) {
-        return this.userService.getAllUsers(query);
+        const result = await this.userService.getAllUsers(query);
+        return mapUserResponse(result);
     }
 
     /**
@@ -58,6 +60,7 @@ export class UserController {
     @ApiBearerAuth()
     @ApiOperation({ summary: "Update own profile (avatar, name, phone, address)" })
     @ApiConsumes("multipart/form-data")
+    @ApiBody({ type: UpdateProfileDto })
     @ApiResponse({
         status: 200,
         description: "Profile updated successfully",
@@ -69,7 +72,8 @@ export class UserController {
         @UploadedFile() file?: any,
     ) {
         const userId = req.payload.userId;
-        return this.userService.updateMyProfile(userId, dto, file);
+        const result = await this.userService.updateMyProfile(userId, dto, file);
+        return mapUserResponse(result);
     }
 
     /**
@@ -85,7 +89,8 @@ export class UserController {
     })
     @ApiResponse({ status: 404, description: "User not found" })
     async getUserById(@Param("id") id: string) {
-        return this.userService.getUserById(id);
+        const result = await this.userService.getUserById(id);
+        return mapUserResponse(result);
     }
 
     /**
@@ -101,7 +106,8 @@ export class UserController {
     })
     @ApiResponse({ status: 400, description: "Bad request" })
     async createUser(@Body() createUserDto: CreateUserDto) {
-        return this.userService.createUser(createUserDto);
+        const result = await this.userService.createUser(createUserDto);
+        return mapUserResponse(result);
     }
 
     /**
@@ -119,7 +125,8 @@ export class UserController {
     @ApiResponse({ status: 404, description: "User not found" })
     @ApiResponse({ status: 400, description: "Bad request" })
     async updateUser(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
-        return this.userService.updateUser(id, updateUserDto);
+        const result = await this.userService.updateUser(id, updateUserDto);
+        return mapUserResponse(result);
     }
 
     /**
@@ -135,7 +142,8 @@ export class UserController {
     })
     @ApiResponse({ status: 404, description: "User not found" })
     async deleteUser(@Param("id") id: string) {
-        return this.userService.deleteUser(id);
+        const result = await this.userService.deleteUser(id);
+        return mapUserResponse(result);
     }
 
     /**
@@ -151,7 +159,8 @@ export class UserController {
     })
     @ApiResponse({ status: 404, description: "User not found" })
     async blockUser(@Param("id") id: string) {
-        return this.userService.blockUser(id);
+        const result = await this.userService.blockUser(id);
+        return mapUserResponse(result);
     }
 
     /**
@@ -206,7 +215,8 @@ export class UserController {
     @ApiBearerAuth()
     @ApiOperation({ summary: "Get all tier upgrade applications (Admin only) — supports ?page=1&limit=10" })
     async getUpgradeApplications(@Query() query: PaginationQueryDto) {
-        return this.userService.getUpgradeApplications(query);
+        const result = await this.userService.getUpgradeApplications(query);
+        return mapUserResponse(result);
     }
 
     @Get("hub-provider-applications")
@@ -224,7 +234,8 @@ export class UserController {
     @ApiBearerAuth()
     @ApiOperation({ summary: "Get all corporate partner applications (Admin only) — supports ?page=1&limit=10" })
     async getCorporatePartnerApplications(@Query() query: PaginationQueryDto) {
-        return this.userService.getCorporatePartnerApplications(query);
+        const result = await this.userService.getCorporatePartnerApplications(query);
+        return mapUserResponse(result);
     }
 
     @Put("upgrade-applications/:id/review")

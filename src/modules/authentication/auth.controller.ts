@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Patch, UseGuards, Request } from "@nestjs/common";
+import { Body, Controller, Post, Patch, Get, UseGuards, Request } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import { RegisterUserDto } from "./dtos/RegisterUserDto";
@@ -12,7 +12,7 @@ import { JwtAuthGuard } from "src/common/guards/auth.guard";
 @ApiTags("Authentication")
 @Controller("auth")
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(private readonly authService: AuthService) { }
 
     /**
      * Register a new user
@@ -90,5 +90,19 @@ export class AuthController {
         @Body() resetPasswordDto: ResetPasswordDto,
     ) {
         return this.authService.resetPassword(resetPasswordDto);
+    }
+
+    /**
+     * Get user details and profile details for the authenticated user
+     */
+    @Get("profile")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get user details and profile details for the authenticated user" })
+    @ApiResponse({ status: 200, description: "Successfully retrieved profile details" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async getProfile(@Request() req: any) {
+        const userId = req.payload.userId;
+        return this.authService.getProfile(userId);
     }
 }

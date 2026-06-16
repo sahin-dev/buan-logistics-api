@@ -9,6 +9,7 @@ import { AuthResponseDto } from "./dtos/AuthResponseDto";
 import { SmtpProvider } from "src/common/providers/smtp.provider";
 import { ChangePasswordDto } from "./dtos/ChangePasswordDto";
 import { ResetPasswordDto } from "./dtos/ResetPasswordDto";
+import { mapRoleByTier, mapUserResponse } from "src/common/utils/role-mapper.util";
 
 @Injectable()
 export class AuthService {
@@ -77,7 +78,7 @@ export class AuthService {
             return {
                 token,
                 email: user.email,
-                role: user.role,
+                role: mapRoleByTier(user.role, user.tier),
             };
         } catch (error) {
             this.logger.error("Error registering user:", error);
@@ -127,7 +128,7 @@ export class AuthService {
             return {
                 token,
                 email: user.email,
-                role: user.role,
+                role: mapRoleByTier(user.role, user.tier),
             };
         } catch (error) {
             if (error instanceof UnauthorizedException) {
@@ -288,5 +289,27 @@ export class AuthService {
             success: true,
             message: "Password has been reset successfully",
         };
+    }
+
+    /**
+     * Get user details and profile details for an authenticated user
+     * @param userId - ID of the authenticated user
+     * @returns User object with profile details and without the password field
+     */
+    async getProfile(userId: string) {
+        const user = await this.prismaService.user.findUnique({
+            where: { id: userId },
+            include: {
+                profile: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException("User not found");
+        }
+
+        // Exclude password field from the response
+        const { password, ...userWithoutPassword } = user;
+        return mapUserResponse(userWithoutPassword);
     }
 }
