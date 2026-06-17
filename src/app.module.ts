@@ -15,12 +15,13 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { ReferralModule } from './modules/referral/referral.module';
 import dbConfig from './config/db.config';
 import smtpConfig from './config/smtp.config';
+import { FileUploadModule } from './modules/file-upload/file-upload.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load:[dbConfig, smtpConfig]
+      load: [dbConfig, smtpConfig]
     }),
     EventEmitterModule.forRoot(),
     PrismaModule,
@@ -33,8 +34,9 @@ import smtpConfig from './config/smtp.config';
     DashboardModule,
     NotificationModule,
     ReferralModule,
+    FileUploadModule
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

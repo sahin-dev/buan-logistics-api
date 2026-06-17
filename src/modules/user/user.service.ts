@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, Logger, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "../prisma/prisma.service";
 import { User } from "generated/prisma/client";
@@ -6,6 +6,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { PaginationQueryDto } from "src/common/dtos/pagination-query.dto";
 import { PaginatedResponseDto } from "src/common/dtos/paginated-response.dto";
+import { ApplyUpgradeDto } from "./dtos/apply-upgrade.dto";
+import { UpdateUpgradeApplicationDto } from "./dtos/update-upgrade-application.dto";
+import { UpdateHubProviderApplicationDto } from "./dtos/update-hub-provider-application.dto";
+import { UpdateCorporatePartnerApplicationDto } from "./dtos/update-corporate-partner-application.dto";
 
 @Injectable()
 export class UserService {
@@ -453,12 +457,70 @@ export class UserService {
         }
     }
 
-    async applyForUpgrade(userId: string, targetTier: any) {
+    async applyForUpgrade(userId: string, dto: ApplyUpgradeDto) {
+        // Check if user already has a pending upgrade application
+        const existingApp = await this.prismaService.upgradeApplication.findFirst({
+            where: {
+                userId,
+                status: 'Pending',
+            },
+        });
+
+        if (existingApp) {
+            throw new BadRequestException('You already have a pending upgrade application.');
+        }
+
+        // Check user's current tier
+        const user = await this.prismaService.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.tier === dto.targetTier) {
+            throw new BadRequestException(`You are already at tier ${dto.targetTier}.`);
+        }
+
+        if (user.tier === 'T3') {
+            throw new BadRequestException('You are already at the highest tier (T3).');
+        }
+
+        if (user.tier === 'T2' && dto.targetTier === 'T1') {
+            throw new BadRequestException('Downgrades are not allowed.');
+        }
+
         const app = await this.prismaService.upgradeApplication.create({
             data: {
                 userId,
-                targetTier,
+                targetTier: dto.targetTier,
                 status: 'Pending',
+                // T2
+                autorizedPersonFullName: dto.autorizedPersonFullName,
+                authorizedPersonTitle: dto.authorizedPersonTitle,
+                companyName: dto.companyName,
+                tradingName: dto.tradingName,
+                Reg_no: dto.Reg_no,
+                country: dto.country,
+                address: dto.address,
+                email: dto.email,
+                phone: dto.phone,
+                website: dto.website,
+                type: dto.type,
+                operation_mode: dto.operation_mode,
+                // T3
+                yearsInOperation: dto.yearsInOperation,
+                contactName: dto.contactName,
+                contactPosition: dto.contactPosition,
+                contactPhone: dto.contactPhone,
+                contactEmail: dto.contactEmail,
+                businessNature: dto.businessNature,
+                countriesOperateFrom: dto.countriesOperateFrom,
+                countriesShipTo: dto.countriesShipTo,
+                cargoTypes: dto.cargoTypes,
+                estimatedMonthlyVolume: dto.estimatedMonthlyVolume,
+                servicesRequired: dto.servicesRequired,
             },
         });
 
@@ -472,6 +534,21 @@ export class UserService {
     }
 
     async applyForHubProvider(dto: any) {
+        // Check if there is already a pending application with the same email or ownerEmail
+        const existingApp = await this.prismaService.hubProviderApplication.findFirst({
+            where: {
+                OR: [
+                    { email: dto.email },
+                    { ownerEmail: dto.ownerEmail },
+                ],
+                status: 'Pending',
+            },
+        });
+
+        if (existingApp) {
+            throw new BadRequestException('A pending application with this email or owner email already exists.');
+        }
+
         const app = await this.prismaService.hubProviderApplication.create({
             data: {
                 ...dto,
@@ -540,10 +617,97 @@ export class UserService {
         });
 
         if (status === 'Accepted') {
+            const updateData: any = { tier: app.targetTier };
+            if (app.targetTier === 'T3') {
+                updateData.role = 'CORPORATE_PARTNER';
+            }
             await this.prismaService.user.update({
                 where: { id: app.userId },
-                data: { tier: app.targetTier },
+                data: updateData,
             });
+
+            if (app.targetTier === 'T2') {
+                await this.prismaService.businessProfile.upsert({
+                    where: { userId: app.userId },
+                    create: {
+                        userId: app.userId,
+                        autorizedPersonFullName: app.autorizedPersonFullName || '',
+                        authorizedPersonTitle: app.authorizedPersonTitle || '',
+                        companyName: app.companyName || '',
+                        tradingName: app.tradingName || '',
+                        Reg_no: app.Reg_no || '',
+                        country: app.country || '',
+                        address: app.address || '',
+                        email: app.email || '',
+                        phone: app.phone || '',
+                        website: app.website || '',
+                        type: app.type || '',
+                        operation_mode: app.operation_mode || 'Both',
+                        status: 'Accepted',
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    },
+                    update: {
+                        autorizedPersonFullName: app.autorizedPersonFullName || '',
+                        authorizedPersonTitle: app.authorizedPersonTitle || '',
+                        companyName: app.companyName || '',
+                        tradingName: app.tradingName || '',
+                        Reg_no: app.Reg_no || '',
+                        country: app.country || '',
+                        address: app.address || '',
+                        email: app.email || '',
+                        phone: app.phone || '',
+                        website: app.website || '',
+                        type: app.type || '',
+                        operation_mode: app.operation_mode || 'Both',
+                        status: 'Accepted',
+                        updatedAt: new Date(),
+                    },
+                });
+            } else if (app.targetTier === 'T3') {
+                await this.prismaService.corporatePartnerProfile.upsert({
+                    where: { userId: app.userId },
+                    create: {
+                        userId: app.userId,
+                        companyName: app.companyName || '',
+                        tradingName: app.tradingName || '',
+                        regNo: app.Reg_no || '',
+                        country: app.country || '',
+                        address: app.address || '',
+                        yearsInOperation: app.yearsInOperation || '',
+                        contactName: app.contactName || '',
+                        contactPosition: app.contactPosition || '',
+                        contactPhone: app.contactPhone || '',
+                        contactEmail: app.contactEmail || '',
+                        website: app.website || '',
+                        businessNature: app.businessNature || [],
+                        countriesOperateFrom: app.countriesOperateFrom || '',
+                        countriesShipTo: app.countriesShipTo || '',
+                        cargoTypes: app.cargoTypes || [],
+                        estimatedMonthlyVolume: app.estimatedMonthlyVolume || '',
+                        servicesRequired: app.servicesRequired || '',
+                    },
+                    update: {
+                        companyName: app.companyName || '',
+                        tradingName: app.tradingName || '',
+                        regNo: app.Reg_no || '',
+                        country: app.country || '',
+                        address: app.address || '',
+                        yearsInOperation: app.yearsInOperation || '',
+                        contactName: app.contactName || '',
+                        contactPosition: app.contactPosition || '',
+                        contactPhone: app.contactPhone || '',
+                        contactEmail: app.contactEmail || '',
+                        website: app.website || '',
+                        businessNature: app.businessNature || [],
+                        countriesOperateFrom: app.countriesOperateFrom || '',
+                        countriesShipTo: app.countriesShipTo || '',
+                        cargoTypes: app.cargoTypes || [],
+                        estimatedMonthlyVolume: app.estimatedMonthlyVolume || '',
+                        servicesRequired: app.servicesRequired || '',
+                    },
+                });
+            }
         }
 
         this.eventEmitter.emit('user.application_reviewed', {
@@ -738,4 +902,155 @@ export class UserService {
 
         return updatedApp;
     }
-}
+
+    async getMyUpgradeApplications(userId: string, query: PaginationQueryDto) {
+        const { page, limit } = query;
+        const skip = query.getSkip();
+
+        const [data, totalItems] = await Promise.all([
+            this.prismaService.upgradeApplication.findMany({
+                where: { userId },
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prismaService.upgradeApplication.count({
+                where: { userId },
+            }),
+        ]);
+
+        return PaginatedResponseDto.create(data, totalItems, page, limit);
+    }
+
+    async getMyHubProviderApplications(userId: string, query: PaginationQueryDto) {
+        const user = await this.prismaService.user.findUnique({
+            where: { id: userId },
+            select: { email: true },
+        });
+
+        if (!user) {
+            throw new NotFoundException(`User with ID ${userId} not found`);
+        }
+
+        const { page, limit } = query;
+        const skip = query.getSkip();
+
+        const [data, totalItems] = await Promise.all([
+            this.prismaService.hubProviderApplication.findMany({
+                where: { ownerEmail: user.email },
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prismaService.hubProviderApplication.count({
+                where: { ownerEmail: user.email },
+            }),
+        ]);
+
+        return PaginatedResponseDto.create(data, totalItems, page, limit);
+    }
+
+    async getMyCorporateApplications(userId: string, query: PaginationQueryDto) {
+        const { page, limit } = query;
+        const skip = query.getSkip();
+
+        const [data, totalItems] = await Promise.all([
+            this.prismaService.corporatePartnerApplication.findMany({
+                where: { userId },
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prismaService.corporatePartnerApplication.count({
+                where: { userId },
+            }),
+        ]);
+
+        return PaginatedResponseDto.create(data, totalItems, page, limit);
+    }
+
+    async updateUpgradeApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateUpgradeApplicationDto) {
+        const app = await this.prismaService.upgradeApplication.findUnique({
+            where: { id },
+        });
+        if (!app) {
+            throw new NotFoundException(`Upgrade application with ID ${id} not found`);
+        }
+
+        if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+            throw new ForbiddenException('You can only update your own application');
+        }
+
+        const updateData: any = { ...dto };
+        if (requesterRole !== 'ADMIN') {
+            delete updateData.status;
+            delete updateData.notes;
+        }
+
+        return this.prismaService.upgradeApplication.update({
+            where: { id },
+            data: updateData,
+        });
+    }
+
+    async updateHubProviderApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateHubProviderApplicationDto) {
+        const app = await this.prismaService.hubProviderApplication.findUnique({
+            where: { id },
+        });
+        if (!app) {
+            throw new NotFoundException(`Hub provider application with ID ${id} not found`);
+        }
+
+        if (requesterRole !== 'ADMIN') {
+            const user = await this.prismaService.user.findUnique({
+                where: { id: requesterId },
+                select: { email: true },
+            });
+            if (!user || (app.ownerEmail !== user.email && app.email !== user.email)) {
+                throw new ForbiddenException('You can only update your own application');
+            }
+        }
+
+        const updateData: any = { ...dto };
+        if (dto.email_active_window_from) {
+            updateData.email_active_window_from = new Date(dto.email_active_window_from);
+        }
+        if (dto.email_active_window_to) {
+            updateData.email_active_window_to = new Date(dto.email_active_window_to);
+        }
+
+        if (requesterRole !== 'ADMIN') {
+            delete updateData.status;
+            delete updateData.rejection_notes;
+        }
+
+        return this.prismaService.hubProviderApplication.update({
+            where: { id },
+            data: updateData,
+        });
+    }
+
+    async updateCorporatePartnerApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateCorporatePartnerApplicationDto) {
+        const app = await this.prismaService.corporatePartnerApplication.findUnique({
+            where: { id },
+        });
+        if (!app) {
+            throw new NotFoundException(`Corporate partner application with ID ${id} not found`);
+        }
+
+        if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+            throw new ForbiddenException('You can only update your own application');
+        }
+
+        const updateData: any = { ...dto };
+        if (requesterRole !== 'ADMIN') {
+            delete updateData.status;
+            delete updateData.rejectionNotes;
+        }
+
+        return this.prismaService.corporatePartnerApplication.update({
+            where: { id },
+            data: updateData,
+        });
+    }
+    }

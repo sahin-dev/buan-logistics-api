@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { Multer } from 'multer';
 
 @Injectable()
 export class FileUploadService {
@@ -35,6 +34,20 @@ export class FileUploadService {
 
     // Return the relative path from project root
     return { filePath: `uploads/${uniqueName}` };
+  }
+
+  async uploadMultipleFiles(files: Express.Multer.File[]): Promise<{ filePaths: string[] }> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files provided.');
+    }
+
+    const filePaths: string[] = [];
+    for (const file of files) {
+      const res = await this.uploadFile(file);
+      filePaths.push(res.filePath);
+    }
+
+    return { filePaths };
   }
 
   async deleteFile(filePath: string): Promise<{ message: string }> {

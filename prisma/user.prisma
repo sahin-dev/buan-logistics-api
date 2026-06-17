@@ -140,6 +140,33 @@ model UpgradeApplication {
     createdAt  DateTime          @default(now())
     updatedAt  DateTime          @updatedAt
 
+    // Business Customer (Tier 2) Fields
+    autorizedPersonFullName  String?
+    authorizedPersonTitle    String?
+    companyName              String?
+    tradingName              String?
+    Reg_no                   String?
+    country                  String?
+    address                  String?
+    email                    String?
+    phone                    String?
+    website                  String?
+    type                     String?
+    operation_mode           OperationMode?
+
+    // Business Partner (Tier 3) Fields
+    yearsInOperation         String?
+    contactName              String?
+    contactPosition          String?
+    contactPhone             String?
+    contactEmail             String?
+    businessNature           String[]
+    countriesOperateFrom     String?
+    countriesShipTo          String?
+    cargoTypes               String[]
+    estimatedMonthlyVolume   String?
+    servicesRequired         String?
+
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

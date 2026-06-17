@@ -22,6 +22,9 @@ import { UpdateProfileDto } from "./dtos/update-profile.dto";
 import { ApplyUpgradeDto } from "./dtos/apply-upgrade.dto";
 import { HubProviderApplicationDto } from "./dtos/hub-provider-application.dto";
 import { CreateCorporateApplicationDto } from "./dtos/create-corporate-application.dto";
+import { UpdateUpgradeApplicationDto } from "./dtos/update-upgrade-application.dto";
+import { UpdateHubProviderApplicationDto } from "./dtos/update-hub-provider-application.dto";
+import { UpdateCorporatePartnerApplicationDto } from "./dtos/update-corporate-partner-application.dto";
 import { JwtAuthGuard } from "src/common/guards/auth.guard";
 import { RolesGuard } from "src/common/guards/roles.guard";
 import { Roles } from "src/common/decorators/roles.decorator";
@@ -189,7 +192,7 @@ export class UserController {
     @ApiOperation({ summary: "Apply for a tier upgrade (T1 -> T2/T3)" })
     async applyUpgrade(@Request() req: any, @Body() dto: ApplyUpgradeDto) {
         const userId = req.payload.userId;
-        return this.userService.applyForUpgrade(userId, dto.targetTier);
+        return this.userService.applyForUpgrade(userId, dto);
     }
 
     @Post("apply-hub-provider")
@@ -207,6 +210,35 @@ export class UserController {
     async applyCorporatePartner(@Request() req: any, @Body() dto: CreateCorporateApplicationDto) {
         const userId = req.payload.userId;
         return this.userService.applyForCorporatePartner(userId, dto);
+    }
+
+    @Get("me/upgrade-applications")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get own upgrade applications (paginated) — supports ?page=1&limit=10" })
+    async getMyUpgradeApplications(@Request() req: any, @Query() query: PaginationQueryDto) {
+        const userId = req.payload.userId;
+        const result = await this.userService.getMyUpgradeApplications(userId, query);
+        return mapUserResponse(result);
+    }
+
+    @Get("me/hub-provider-applications")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get own hub provider applications (paginated) — supports ?page=1&limit=10" })
+    async getMyHubProviderApplications(@Request() req: any, @Query() query: PaginationQueryDto) {
+        const userId = req.payload.userId;
+        return this.userService.getMyHubProviderApplications(userId, query);
+    }
+
+    @Get("me/corporate-applications")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get own corporate partner applications (paginated) — supports ?page=1&limit=10" })
+    async getMyCorporateApplications(@Request() req: any, @Query() query: PaginationQueryDto) {
+        const userId = req.payload.userId;
+        const result = await this.userService.getMyCorporateApplications(userId, query);
+        return mapUserResponse(result);
     }
 
     @Get("upgrade-applications")
@@ -273,4 +305,43 @@ export class UserController {
     ) {
         return this.userService.reviewCorporatePartnerApplication(id, reviewApplicationDto.status, reviewApplicationDto.notes);
     }
-}
+
+    @Patch("upgrade-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update upgrade application (Admin or Owner)" })
+    async updateUpgradeApplication(
+        @Request() req: any,
+        @Param("id") id: string,
+        @Body() dto: UpdateUpgradeApplicationDto
+    ) {
+        const { userId, role } = req.payload;
+        return this.userService.updateUpgradeApplication(id, userId, role, dto);
+    }
+
+    @Patch("hub-provider-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update hub provider application (Admin or Owner)" })
+    async updateHubProviderApplication(
+        @Request() req: any,
+        @Param("id") id: string,
+        @Body() dto: UpdateHubProviderApplicationDto
+    ) {
+        const { userId, role } = req.payload;
+        return this.userService.updateHubProviderApplication(id, userId, role, dto);
+    }
+
+    @Patch("corporate-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update corporate partner application (Admin or Owner)" })
+    async updateCorporatePartnerApplication(
+        @Request() req: any,
+        @Param("id") id: string,
+        @Body() dto: UpdateCorporatePartnerApplicationDto
+    ) {
+        const { userId, role } = req.payload;
+        return this.userService.updateCorporatePartnerApplication(id, userId, role, dto);
+    }
+    }

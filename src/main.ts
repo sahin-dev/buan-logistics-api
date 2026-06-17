@@ -1,9 +1,11 @@
-import { NestApplication, NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { ResponseTransformerInterceptor } from './common/interceptors/responseTransformer.interceptor';
+import { GlobalHttpExceptionFilter } from './common/exceptions/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -25,6 +27,10 @@ async function bootstrap() {
     allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With"],
   })
 
+  // Global response format: { success, statusCode, message, data }
+  app.useGlobalInterceptors(new ResponseTransformerInterceptor(app.get(Reflector)));
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
+
   const config = new DocumentBuilder()
     .setTitle('Buan Logistics API')
     .setDescription('Buan Logistics API description')
@@ -38,3 +44,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
+
