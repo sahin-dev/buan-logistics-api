@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateT1ShipmentDto } from './dtos/create-t1-shipment.dto';
@@ -9,44 +9,45 @@ import { PasswordHasher } from '../authentication/utils/PasswordHasher';
 import { ShipmentStatus, ShipmentType, Tier, Role, ContainerType, ContainerStatus } from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
+import { SmtpProvider } from 'src/common/providers/smtp.provider';
 
 @Injectable()
 export class ShipmentService {
+  private readonly logger = new Logger(ShipmentService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwordHasher: PasswordHasher,
     private readonly eventEmitter: EventEmitter2,
+    private readonly smtpProvider: SmtpProvider,
   ) {}
 
   async createT1Shipment(dto: CreateT1ShipmentDto) {
-    // 1. Search sender by phone number
-    const profile = await this.prisma.userProfile.findFirst({
-      where: { phone: dto.senderPhone },
-      include: { user: true },
+    // 1. Search sender by email
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.senderEmail },
+      include: { profile: true },
     });
 
     let userId: string;
+    let isNewUser = false;
+    let generatedPassword = '';
 
-    if (profile) {
-      if (profile.user.tier === Tier.T3 || profile.user.role === Role.CORPORATE_PARTNER) {
+    if (existingUser) {
+      if (existingUser.tier === Tier.T3 || existingUser.role === Role.CORPORATE_PARTNER) {
         throw new BadRequestException('Container (T3) and Corporate users cannot use hubs. Please go to a branch directly.');
       }
-      userId = profile.userId;
+      userId = existingUser.id;
     } else {
-      // 2. If not found, create new user
-      // Check if email already exists
-      const existingUserByEmail = await this.prisma.user.findUnique({
-        where: { email: dto.senderEmail },
-      });
-      if (existingUserByEmail) {
-        if (existingUserByEmail.tier === Tier.T3 || existingUserByEmail.role === Role.CORPORATE_PARTNER) {
-          throw new BadRequestException('Container (T3) and Corporate users cannot use hubs. Please go to a branch directly.');
-        }
-        throw new BadRequestException(`A user with email ${dto.senderEmail} already exists with a different phone number.`);
+      // 2. If not found, create new user with a random password
+      isNewUser = true;
+      // Generate a random 10-character password
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+      let randomPass = '';
+      for (let i = 0; i < 10; i++) {
+        randomPass += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-
-      const defaultPassword = 'Welcome@BuAn2026';
-      const hashedPassword = await this.passwordHasher.hashPassword(defaultPassword);
+      generatedPassword = randomPass;
+      const hashedPassword = await this.passwordHasher.hashPassword(generatedPassword);
 
       const newUser = await this.prisma.user.create({
         data: {
@@ -96,6 +97,109 @@ export class ShipmentService {
           : 'Parcel received at Hub.',
       },
     });
+
+    // Send Emails
+    try {
+      if (isNewUser) {
+        // Send email 1: Credentials
+        await this.smtpProvider.sendMail({
+          to: dto.senderEmail,
+          subject: 'Welcome to Buan Logistics - Account Created',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+              <h2 style="color: #1a73e8; text-align: center;">Welcome to Buan Logistics</h2>
+              <p>Hello <strong>${dto.senderFirstName} ${dto.senderLastName}</strong>,</p>
+              <p>An account has been automatically created for you in our system following your shipment registration.</p>
+              <p>Here are your temporary login details:</p>
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f8f9fa; border-radius: 5px;">
+                <tr>
+                  <td style="padding: 10px; font-weight: bold; border: 1px solid #dee2e6;">Email:</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6;">${dto.senderEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; font-weight: bold; border: 1px solid #dee2e6;">Temporary Password:</td>
+                  <td style="padding: 10px; border: 1px solid #dee2e6; color: #d93025; font-family: monospace; font-size: 16px;">${generatedPassword}</td>
+                </tr>
+              </table>
+              <p>Please log in and update your password immediately for security reasons.</p>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+              <p style="color: #5f6368; font-size: 12px;">Buan Logistics API Service</p>
+            </div>
+          `,
+        });
+
+        // Send email 2: Shipment details
+        await this.smtpProvider.sendMail({
+          to: dto.senderEmail,
+          subject: 'Buan Logistics - New Shipment Registered',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+              <h2 style="color: #1a73e8; text-align: center;">Shipment Registered Successfully</h2>
+              <p>Hello <strong>${dto.senderFirstName} ${dto.senderLastName}</strong>,</p>
+              <p>Your shipment has been registered and is currently <strong>AT HUB</strong>.</p>
+              <h3 style="color: #1a73e8; margin-top: 20px;">Shipment Information</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment ID:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipment.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Name:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Address:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverAddress}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Weight:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.weight} kg</td>
+                </tr>
+              </table>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+              <p style="color: #5f6368; font-size: 12px;">Buan Logistics API Service</p>
+            </div>
+          `,
+        });
+      } else {
+        // Send single email: Shipment details for existing user
+        await this.smtpProvider.sendMail({
+          to: dto.senderEmail,
+          subject: 'Buan Logistics - New Shipment Registered',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+              <h2 style="color: #1a73e8; text-align: center;">Shipment Registered Successfully</h2>
+              <p>Hello <strong>${existingUser!.profile?.firstName || ''} ${existingUser!.profile?.lastName || ''}</strong>,</p>
+              <p>A new shipment has been registered to your Buan Logistics account and is currently <strong>AT HUB</strong>.</p>
+              <h3 style="color: #1a73e8; margin-top: 20px;">Shipment Information</h3>
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment ID:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipment.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Name:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Address:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverAddress}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Weight:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.weight} kg</td>
+                </tr>
+              </table>
+              <p>You can manage and track this shipment by logging into your dashboard.</p>
+              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
+              <p style="color: #5f6368; font-size: 12px;">Buan Logistics API Service</p>
+            </div>
+          `,
+        });
+      }
+    } catch (err) {
+      this.logger.error('Failed to send shipment creation emails:', err);
+    }
 
     // Emit shipment.created event
     this.eventEmitter.emit('shipment.created', {
@@ -228,7 +332,7 @@ export class ShipmentService {
     return shipment;
   }
 
-  async pickupFromHub(shipmentId: string) {
+  async pickupFromHub(shipmentId: string, photoUrls: string[] = []) {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
     });
@@ -247,6 +351,7 @@ export class ShipmentService {
         shipmentId,
         status: ShipmentStatus.PICKED,
         notes: 'Parcel picked up from hub by truck.',
+        photo_urls: photoUrls,
       },
     });
 
@@ -298,7 +403,7 @@ export class ShipmentService {
     return updated;
   }
 
-  async updateStatus(shipmentId: string, status: ShipmentStatus, notes?: string) {
+  async updateStatus(shipmentId: string, status: ShipmentStatus, notes?: string, photoUrls: string[] = []) {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
     });
@@ -322,6 +427,7 @@ export class ShipmentService {
         shipmentId,
         status,
         notes: notes || `Shipment status updated to ${status}`,
+        photo_urls: photoUrls,
       },
     });
 

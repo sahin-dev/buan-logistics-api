@@ -16,6 +16,7 @@ import { ReferralModule } from './modules/referral/referral.module';
 import dbConfig from './config/db.config';
 import smtpConfig from './config/smtp.config';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
+import { QuoteModule } from './modules/quote/quote.module';
 
 @Module({
   imports: [
@@ -34,7 +35,8 @@ import { FileUploadModule } from './modules/file-upload/file-upload.module';
     DashboardModule,
     NotificationModule,
     ReferralModule,
-    FileUploadModule
+    FileUploadModule,
+    QuoteModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,62 +1,62 @@
 model Shipment {
-    id              String             @id @default(uuid())
-    tracking_number String?            @unique // Generated after payment
+    id              String  @id @default(uuid())
+    tracking_number String? @unique // Generated after payment
     senderId        String
-    sender          User               @relation("SentShipments", fields: [senderId], references: [id])
-    
+    sender          User    @relation("SentShipments", fields: [senderId], references: [id])
+
     // Receiver Info
     receiverName    String
     receiverPhone   String
     receiverAddress String
-    
+
     // Package details
-    weight          Float
-    description     String?
-    packageDetails  Json?              // For dimensions, category etc.
-    containerDetails Json?             // T3 full container details
-    
+    weight           Float
+    description      String?
+    packageDetails   Json? // For dimensions, category etc.
+    containerDetails Json? // T3 full container details
+
     // Locations
-    hubId           String?            // Nullable (T2/T3 go to branch directly)
-    hub             Hub?               @relation("HubShipments", fields: [hubId], references: [id])
-    branchId        String?
-    branch          Branch?            @relation("BranchShipments", fields: [branchId], references: [id])
-    
+    hubId    String? // Nullable (T2/T3 go to branch directly)
+    hub      Hub?    @relation("HubShipments", fields: [hubId], references: [id])
+    branchId String?
+    branch   Branch? @relation("BranchShipments", fields: [branchId], references: [id])
+
     // Cost and billing
-    cost            Float              @default(0.0)
-    
+    cost Float @default(0.0)
+
     // Lifecycle timestamps
-    shipped_at      DateTime?
-    delivered_at    DateTime?
-    
-    timeline        ShipmentTimeline[]
-    current_status  ShipmentStatus     @default(PENDING)
-    type            ShipmentType       @default(STANDARD)
-    invoices        Invoice[]          @relation("SingleShipmentInvoice")
-    rewards         Reward[]
-    
+    shipped_at   DateTime?
+    delivered_at DateTime?
+
+    timeline       ShipmentTimeline[]
+    current_status ShipmentStatus     @default(PENDING)
+    type           ShipmentType       @default(STANDARD)
+    invoices       Invoice[]          @relation("SingleShipmentInvoice")
+    rewards        Reward[]
+
     // Pickup scheduling (for "send for someone else" feature)
-    pickupContactName    String?
-    pickupContactPhone   String?
-    pickupAddress        String?
-    scheduledPickupDate  DateTime?
+    pickupContactName   String?
+    pickupContactPhone  String?
+    pickupAddress       String?
+    scheduledPickupDate DateTime?
 
     // Containers and Corporate Billing
-    containerId          String?
-    container            Container?        @relation("ContainerShipments", fields: [containerId], references: [id], onDelete: SetNull)
-    corporateInvoiceId   String?
-    corporateInvoice     Invoice?          @relation("CorporateInvoiceShipments", fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
+    containerId        String?
+    container          Container? @relation("ContainerShipments", fields: [containerId], references: [id], onDelete: SetNull)
+    corporateInvoiceId String?
+    corporateInvoice   Invoice?   @relation("CorporateInvoiceShipments", fields: [corporateInvoiceId], references: [id], onDelete: SetNull)
 
     // Hub Commissions
-    hubCommission        HubCommission?    @relation("HubShipmentCommission")
+    hubCommission HubCommission? @relation("HubShipmentCommission")
 
-    createdAt       DateTime           @default(now())
-    updatedAt       DateTime           @updatedAt
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-    @@map("shipments")
     @@index([id, tracking_number])
     @@index([senderId])
     @@index([current_status])
     @@index([createdAt])
+    @@map("shipments")
 }
 
 model ShipmentTimeline {
@@ -65,25 +65,27 @@ model ShipmentTimeline {
     status     ShipmentStatus
     timestamp  DateTime       @default(now())
     notes      String?
+    photo_urls String[] // Photos submitted during this status update
     shipment   Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
-    createdAt  DateTime       @default(now())
-    updatedAt  DateTime       @updatedAt
-    @@map("shipment_timelines")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
     @@index([id, shipmentId])
+    @@map("shipment_timelines")
 }
 
 model Container {
-    id              String      @id @default(uuid())
-    containerNumber String      @unique
-    size            String                      // e.g. "20ft", "40ft"
+    id              String          @id @default(uuid())
+    containerNumber String          @unique
+    size            String // e.g. "20ft", "40ft"
     type            ContainerType
-    shipments       Shipment[]  @relation("ContainerShipments")
+    shipments       Shipment[]      @relation("ContainerShipments")
     branchId        String
-    branch          Branch      @relation("BranchContainers", fields: [branchId], references: [id], onDelete: Cascade)
+    branch          Branch          @relation("BranchContainers", fields: [branchId], references: [id], onDelete: Cascade)
     status          ContainerStatus @default(LOADING)
-    createdAt       DateTime    @default(now())
-    updatedAt       DateTime    @updatedAt
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
 
     @@map("containers")
 }

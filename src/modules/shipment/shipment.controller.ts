@@ -1,6 +1,14 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller, Get, Post, Put, Body, Param, UseGuards,
+  Request, Query, UploadedFiles, UseInterceptors,
+} from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
+  ApiBody, ApiConsumes,
+} from '@nestjs/swagger';
 import { ShipmentService } from './shipment.service';
+import { FileUploadService } from '../file-upload/file-upload.service';
 import { CreateT1ShipmentDto } from './dtos/create-t1-shipment.dto';
 import { CreateT2T3ShipmentDto } from './dtos/create-t2t3-shipment.dto';
 import { CreateCorporateShipmentDto } from './dtos/create-corporate-shipment.dto';
@@ -15,7 +23,10 @@ import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 @ApiTags('Shipments & Parcels')
 @Controller('shipments')
 export class ShipmentController {
-  constructor(private readonly shipmentService: ShipmentService) {}
+  constructor(
+    private readonly shipmentService: ShipmentService,
+    private readonly fileUploadService: FileUploadService,
+  ) {}
 
   @Post('t1')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,9 +59,31 @@ export class ShipmentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.HUB_PROIVDER, Role.ADMIN, Role.BRANCH)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mark shipment as picked up from hub (Hub Provider / Admin / Branch Staff only)' })
-  async pickupFromHub(@Param('id') id: string) {
-    return this.shipmentService.pickupFromHub(id);
+  @UseInterceptors(FilesInterceptor('files', 10))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Mark shipment as picked up from hub. Optionally attach photos (Hub Provider / Admin / Branch Staff only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Optional photos taken during pickup',
+        },
+      },
+    },
+  })
+  async pickupFromHub(
+    @Param('id') id: string,
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    let photoUrls: string[] = [];
+    if (files && files.length > 0) {
+      const result = await this.fileUploadService.uploadMultipleFiles(files);
+      photoUrls = result.filePaths;
+    }
+    return this.shipmentService.pickupFromHub(id, photoUrls);
   }
 
   @Put(':id/arrive')
@@ -58,6 +91,16 @@ export class ShipmentController {
   @Roles(Role.ADMIN, Role.BRANCH)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark shipment as arrived at branch, calculate cost, generate invoice (Branch Admin / Staff only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        cost: { type: 'number', example: 120.50, description: 'The final shipping cost calculated for the shipment' },
+        branchId: { type: 'string', example: 'uuid-string-of-branch', description: 'The ID of the branch where the shipment arrived' }
+      },
+      required: ['cost', 'branchId']
+    }
+  })
   async arriveAtBranch(
     @Param('id') id: string,
     @Body('cost') cost: number,
@@ -70,13 +113,45 @@ export class ShipmentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.BRANCH)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update shipment status manually (Admin / Branch Staff only)' })
+  @UseInterceptors(FilesInterceptor('files', 10))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update shipment status manually with optional photos (Admin / Branch Staff only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: Object.values(ShipmentStatus),
+          description: 'The new status of the shipment',
+        },
+        notes: {
+          type: 'string',
+          example: 'Package sorted and ready for transit',
+          description: 'Optional status notes or updates',
+          nullable: true,
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Optional photos taken during this status update',
+        },
+      },
+      required: ['status'],
+    },
+  })
   async updateStatus(
     @Param('id') id: string,
     @Body('status') status: ShipmentStatus,
     @Body('notes') notes?: string,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    return this.shipmentService.updateStatus(id, status, notes);
+    let photoUrls: string[] = [];
+    if (files && files.length > 0) {
+      const result = await this.fileUploadService.uploadMultipleFiles(files);
+      photoUrls = result.filePaths;
+    }
+    return this.shipmentService.updateStatus(id, status, notes, photoUrls);
   }
 
   @Get('hubs-summary')
@@ -117,6 +192,19 @@ export class ShipmentController {
   @Roles(Role.ADMIN, Role.BRANCH)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update container status and notify shipments (Admin/Branch staff only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        status: { 
+          type: 'string', 
+          enum: Object.values(ContainerStatus), 
+          description: 'The new status of the container' 
+        }
+      },
+      required: ['status']
+    }
+  })
   async updateContainerStatus(
     @Param('id') id: string,
     @Body('status') status: ContainerStatus,

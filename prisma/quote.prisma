@@ -1,0 +1,40 @@
+model Quote {
+    id              String      @id @default(uuid())
+    
+    // Sender Information
+    shipmentType    String      // e.g. "Air Cargo" / "Sea cargo"
+    country         String
+    pickupServices  String
+    fullName        String
+    phone           String
+    address         String
+    whatWeArePickingUp String
+    email           String
+    shippingType    String      // e.g. "Express" / "Standard"
+    
+    // Package Information
+    weightOrVolume  String
+    uploadImage     String?     // URL or relative file path of the image
+    
+    // Receiver Information
+    receiverCountry String
+    receiverFullName String
+    receiverPhone   String
+    receiverEmail   String
+    receiverAddress String
+    
+    // Admin Reply Information
+    status          QuoteStatus @default(PENDING)
+    replyMessage    String?
+    repliedAt       DateTime?
+    
+    createdAt       DateTime    @default(now())
+    updatedAt       DateTime    @updatedAt
+    
+    @@map("quotes")
+}
+
+enum QuoteStatus {
+    PENDING
+    REPLIED
+}
