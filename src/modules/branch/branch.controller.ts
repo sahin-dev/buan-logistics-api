@@ -12,7 +12,7 @@ import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 @ApiTags('Branches & Hubs')
 @Controller('branches')
 export class BranchController {
-  constructor(private readonly branchService: BranchService) {}
+  constructor(private readonly branchService: BranchService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,6 +48,7 @@ export class BranchController {
   @Get('hubs/all')
   @ApiOperation({ summary: 'Get all hubs (paginated, supports ?page=1&limit=10&search=keyword)' })
   async getAllHubs(@Query() query: PaginationQueryDto) {
+
     return this.branchService.getAllHubs(query);
   }
 

@@ -254,6 +254,70 @@ export class AuthService {
     }
 
     /**
+     * Resend password reset OTP code
+     */
+    async resendOtp(email: string): Promise<{ success: boolean; message: string }> {
+        const user = await this.prismaService.user.findUnique({
+            where: { email },
+        });
+
+        // For security, don't expose if user exists or not
+        if (!user) {
+            return {
+                success: true,
+                message: "If the email is registered, a new password reset code has been sent",
+            };
+        }
+
+        // Invalidate all previous unused tokens for this user
+        await this.prismaService.passwordResetToken.updateMany({
+            where: {
+                userId: user.id,
+                used: false,
+            },
+            data: { used: true },
+        });
+
+        // Generate a fresh 6-digit OTP
+        const token = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins expiry
+
+        // Store new reset token
+        await this.prismaService.passwordResetToken.create({
+            data: {
+                userId: user.id,
+                token,
+                expiresAt,
+            },
+        });
+
+        // Send Email
+        await this.smtpProvider.sendMail({
+            to: email,
+            subject: "Buan Logistics - New Password Reset Code",
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+                    <h2 style="color: #1a73e8; text-align: center;">New Password Reset Code</h2>
+                    <p>Hello,</p>
+                    <p>You requested a new password reset code for your Buan Logistics account.</p>
+                    <p>Your new password reset code is:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; background-color: #f1f3f4; padding: 10px 20px; border-radius: 5px; color: #202124;">${token}</span>
+                    </div>
+                    <p style="color: #5f6368; font-size: 12px;">This code is valid for 15 minutes. Your previous code has been invalidated. If you did not make this request, you can safely ignore this email.</p>
+                    <hr style="border: none; border-top: 1px solid #e0e0e0;" />
+                    <p style="color: #9aa0a6; font-size: 11px; text-align: center;">Buan Logistics API Service</p>
+                </div>
+            `,
+        });
+
+        return {
+            success: true,
+            message: "If the email is registered, a new password reset code has been sent",
+        };
+    }
+
+    /**
      * Reset password using OTP code
      */
     async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ success: boolean; message: string }> {
@@ -291,6 +355,60 @@ export class AuthService {
         };
     }
 
+    /** 
+     * Verify password reset OTP code
+     */
+    async verifyOtp(token: string): Promise<{ success: boolean; message: string }> {
+        const resetToken = await this.prismaService.passwordResetToken.findUnique({
+            where: { token },
+        });
+
+        if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+            throw new BadRequestException("Invalid, expired, or already used reset code");
+        }
+
+        return {
+            success: true,
+            message: "OTP is valid",
+        };
+    }
+
+    /**
+     * Reset password with newPassword and confirmPassword after OTP validation
+     */
+    async resetPasswordNew(token: string, newPass: string, confirmPass: string): Promise<{ success: boolean; message: string }> {
+        if (newPass !== confirmPass) {
+            throw new BadRequestException("New passwords do not match");
+        }
+
+        const resetToken = await this.prismaService.passwordResetToken.findUnique({
+            where: { token },
+            include: { user: true },
+        });
+
+        if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+            throw new BadRequestException("Invalid, expired, or already used reset code");
+        }
+
+        // Mark token as used
+        await this.prismaService.passwordResetToken.update({
+            where: { id: resetToken.id },
+            data: { used: true },
+        });
+
+        const hashedNewPassword = await this.passwordHasher.hashPassword(newPass);
+
+        await this.prismaService.user.update({
+            where: { id: resetToken.userId },
+            data: { password: hashedNewPassword },
+        });
+
+        return {
+            success: true,
+            message: "Password has been reset successfully",
+        };
+    }
+
     /**
      * Get user details and profile details for an authenticated user
      * @param userId - ID of the authenticated user
@@ -310,6 +428,6 @@ export class AuthService {
 
         // Exclude password field from the response
         const { password, ...userWithoutPassword } = user;
-        return mapUserResponse(userWithoutPassword);
+        return mapUserResponse({ ...userWithoutPassword });
     }
 }

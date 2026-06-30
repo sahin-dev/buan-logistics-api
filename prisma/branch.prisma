@@ -3,6 +3,8 @@ model Branch {
     name      String
     address   String
     city      String
+    latitude  Float?
+    longitude Float?
     hubs      Hub[]
     shipments Shipment[]  @relation("BranchShipments")
     containers Container[] @relation("BranchContainers")

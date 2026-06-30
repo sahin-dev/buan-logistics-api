@@ -25,6 +25,8 @@ import { CreateCorporateApplicationDto } from "./dtos/create-corporate-applicati
 import { UpdateUpgradeApplicationDto } from "./dtos/update-upgrade-application.dto";
 import { UpdateHubProviderApplicationDto } from "./dtos/update-hub-provider-application.dto";
 import { UpdateCorporatePartnerApplicationDto } from "./dtos/update-corporate-partner-application.dto";
+import { CreateAddressDto } from "./dtos/create-address.dto";
+import { UpdateAddressDto } from "./dtos/update-address.dto";
 import { JwtAuthGuard } from "src/common/guards/auth.guard";
 import { RolesGuard } from "src/common/guards/roles.guard";
 import { Roles } from "src/common/decorators/roles.decorator";
@@ -43,6 +45,9 @@ export class UserController {
      * @returns List of all users
      */
     @Get()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
     @ApiOperation({ summary: "Get all users (paginated, supports ?page=1&limit=10&search=keyword)" })
     @ApiResponse({
         status: 200,
@@ -79,22 +84,6 @@ export class UserController {
         return mapUserResponse(result);
     }
 
-    /**
-     * Get a user by ID
-     * @param id - User ID
-     * @returns User details
-     */
-    @Get(":id")
-    @ApiOperation({ summary: "Get user by ID" })
-    @ApiResponse({
-        status: 200,
-        description: "User retrieved successfully",
-    })
-    @ApiResponse({ status: 404, description: "User not found" })
-    async getUserById(@Param("id") id: string) {
-        const result = await this.userService.getUserById(id);
-        return mapUserResponse(result);
-    }
 
     /**
      * Create a new user
@@ -102,6 +91,9 @@ export class UserController {
      * @returns Created user
      */
     @Post()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
     @ApiOperation({ summary: "Create a new user" })
     @ApiResponse({
         status: 201,
@@ -119,72 +111,6 @@ export class UserController {
      * @param updateUserDto - User update data
      * @returns Updated user
      */
-    @Put(":id")
-    @ApiOperation({ summary: "Update a user" })
-    @ApiResponse({
-        status: 200,
-        description: "User updated successfully",
-    })
-    @ApiResponse({ status: 404, description: "User not found" })
-    @ApiResponse({ status: 400, description: "Bad request" })
-    async updateUser(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
-        const result = await this.userService.updateUser(id, updateUserDto);
-        return mapUserResponse(result);
-    }
-
-    /**
-     * Delete a user
-     * @param id - User ID
-     * @returns Deleted user
-     */
-    @Delete(":id")
-    @ApiOperation({ summary: "Delete a user" })
-    @ApiResponse({
-        status: 200,
-        description: "Delete a user",
-    })
-    @ApiResponse({ status: 404, description: "User not found" })
-    async deleteUser(@Param("id") id: string) {
-        const result = await this.userService.deleteUser(id);
-        return mapUserResponse(result);
-    }
-
-    /**
-     * Block a user
-     * @param id - User ID
-     * @returns Blocked user
-     */
-    @Patch(":id/block")
-    @ApiOperation({ summary: "Block a user" })
-    @ApiResponse({
-        status: 200,
-        description: "User blocked successfully",
-    })
-    @ApiResponse({ status: 404, description: "User not found" })
-    async blockUser(@Param("id") id: string) {
-        const result = await this.userService.blockUser(id);
-        return mapUserResponse(result);
-    }
-
-    /**
-     * Upload user avatar
-     * @param id - User ID
-     * @param file - Avatar file
-     * @returns Upload result
-     */
-    @Post(":id/avatar")
-    @UseInterceptors(FileInterceptor("file"))
-    @ApiOperation({ summary: "Upload user avatar" })
-    @ApiConsumes("multipart/form-data")
-    @ApiResponse({
-        status: 200,
-        description: "Avatar uploaded successfully",
-    })
-    @ApiResponse({ status: 400, description: "Bad request or invalid file" })
-    @ApiResponse({ status: 404, description: "User not found" })
-    async uploadAvatar(@Param("id") id: string, @UploadedFile() file: any) {
-        return this.userService.uploadAvatar(id, file);
-    }
 
     @Post("apply-upgrade")
     @UseGuards(JwtAuthGuard)
@@ -247,6 +173,7 @@ export class UserController {
     @ApiBearerAuth()
     @ApiOperation({ summary: "Get all tier upgrade applications (Admin only) — supports ?page=1&limit=10" })
     async getUpgradeApplications(@Query() query: PaginationQueryDto) {
+        console.log(query)
         const result = await this.userService.getUpgradeApplications(query);
         return mapUserResponse(result);
     }
@@ -275,6 +202,7 @@ export class UserController {
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Review upgrade application (Admin only)" })
+    @ApiBody({ type: ReviewApplicationDto })
     async reviewUpgradeApplication(
         @Param("id") id: string,
         @Body() reviewApplicationDto: ReviewApplicationDto
@@ -287,6 +215,7 @@ export class UserController {
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Review hub provider application (Admin only)" })
+    @ApiBody({ type: ReviewApplicationDto })
     async reviewHubProviderApplication(
         @Param("id") id: string,
         @Body() reviewApplicationDto: ReviewApplicationDto
@@ -299,6 +228,7 @@ export class UserController {
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
     @ApiOperation({ summary: "Review corporate partner application (Admin only)" })
+    @ApiBody({ type: ReviewApplicationDto })
     async reviewCorporatePartnerApplication(
         @Param("id") id: string,
         @Body() reviewApplicationDto: ReviewApplicationDto
@@ -315,7 +245,8 @@ export class UserController {
         @Param("id") id: string,
         @Body() dto: UpdateUpgradeApplicationDto
     ) {
-        const { userId, role } = req.payload;
+        const userId = req.payload.userId;
+        const role = req.payload.role;
         return this.userService.updateUpgradeApplication(id, userId, role, dto);
     }
 
@@ -328,7 +259,8 @@ export class UserController {
         @Param("id") id: string,
         @Body() dto: UpdateHubProviderApplicationDto
     ) {
-        const { userId, role } = req.payload;
+        const userId = req.payload.userId;
+        const role = req.payload.role;
         return this.userService.updateHubProviderApplication(id, userId, role, dto);
     }
 
@@ -341,7 +273,247 @@ export class UserController {
         @Param("id") id: string,
         @Body() dto: UpdateCorporatePartnerApplicationDto
     ) {
-        const { userId, role } = req.payload;
+        const userId = req.payload.userId;
+        const role = req.payload.role;
         return this.userService.updateCorporatePartnerApplication(id, userId, role, dto);
     }
+
+
+
+    @Get("upgrade-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get upgrade application (Admin or Owner)" })
+    async getUpgradeApplication(
+        @Request() req: any,
+        @Param("id") id: string,
+
+    ) {
+        const userId = req.payload.userId;
+        const role = req.payload.role;
+        return this.userService.getUpgradeApplication(id, userId, role);
     }
+
+    @Get("hub-provider-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get hub provider application (Admin or Owner)" })
+    async getHubProviderApplication(
+        @Request() req: any,
+        @Param("id") id: string
+    ) {
+        const userId = req.payload.userId;
+        const role = req.payload.role;
+        return this.userService.getHubProviderApplication(id, userId, role);
+    }
+
+    @Get("corporate-applications/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get corporate partner application (Admin or Owner)" })
+    async getCorporatePartnerApplication(
+        @Request() req: any,
+        @Param("id") id: string
+    ) {
+        const userId = req.payload.userId;
+        const role = req.payload.role;
+        return this.userService.getCorporatePartnerApplication(id, userId, role);
+    }
+
+    /**
+     * Search user by email (Admin, Branch Staff, Hub Provider)
+     */
+    @Get("lookup-by-email")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN, Role.BRANCH, Role.HUB_PROIVDER)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Search user by email to retrieve registration status, details and default address" })
+    @ApiResponse({ status: 200, description: "Lookup completed successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async lookupByEmail(@Query("email") email: string) {
+        return this.userService.lookupByEmail(email);
+    }
+
+    /**
+     * Fetch own dashboard stats
+     */
+    @Get("me/dashboard-stats")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Retrieve number of addresses and current shipments status counts for logged-in user" })
+    @ApiResponse({ status: 200, description: "Stats retrieved successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async getMyDashboardStats(@Request() req: any) {
+        const userId = req.payload.userId;
+        return this.userService.getUserStats(userId);
+    }
+
+    /**
+     * Get all addresses of the logged-in user
+     */
+    @Get("me/addresses")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get all addresses for the authenticated user" })
+    @ApiResponse({ status: 200, description: "List of addresses retrieved successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async getMyAddresses(@Request() req: any) {
+        const userId = req.payload.userId;
+        return this.userService.getAddresses(userId);
+    }
+
+    /**
+     * Add a new address to profile
+     */
+    @Post("me/addresses")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Add a new address to user profile" })
+    @ApiResponse({ status: 201, description: "Address added successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    async addMyAddress(
+        @Request() req: any,
+        @Body() dto: CreateAddressDto,
+    ) {
+        const userId = req.payload.userId;
+        return this.userService.addAddress(userId, dto);
+    }
+
+    /**
+     * Update an existing address
+     */
+    @Put("me/addresses/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update an existing user address" })
+    @ApiResponse({ status: 200, description: "Address updated successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    @ApiResponse({ status: 404, description: "Address not found" })
+    async updateMyAddress(
+        @Request() req: any,
+        @Param("id") id: string,
+        @Body() dto: UpdateAddressDto,
+    ) {
+        const userId = req.payload.userId;
+        return this.userService.updateAddress(userId, id, dto);
+    }
+
+    /**
+     * Delete an address
+     */
+    @Delete("me/addresses/:id")
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Delete a user address" })
+    @ApiResponse({ status: 200, description: "Address deleted successfully" })
+    @ApiResponse({ status: 401, description: "Unauthorized" })
+    @ApiResponse({ status: 404, description: "Address not found" })
+    async deleteMyAddress(
+        @Request() req: any,
+        @Param("id") id: string,
+    ) {
+        const userId = req.payload.userId;
+        return this.userService.deleteAddress(userId, id);
+    }
+
+    /**
+     * Get a user by ID
+     * @param id - User ID
+     * @returns User details
+     */
+    @Get(":id")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Get user by ID" })
+    @ApiResponse({
+        status: 200,
+        description: "User retrieved successfully",
+    })
+    @ApiResponse({ status: 404, description: "User not found" })
+    async getUserById(@Param("id") id: string) {
+        const result = await this.userService.getUserById(id);
+        return mapUserResponse(result);
+    }
+
+
+    @Put(":id")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Update a user" })
+    @ApiResponse({
+        status: 200,
+        description: "User updated successfully",
+    })
+    @ApiResponse({ status: 404, description: "User not found" })
+    @ApiResponse({ status: 400, description: "Bad request" })
+    async updateUser(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
+        const result = await this.userService.updateUser(id, updateUserDto);
+        return mapUserResponse(result);
+    }
+
+    /**
+     * Delete a user
+     * @param id - User ID
+     * @returns Deleted user
+     */
+    @Delete(":id")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Delete a user" })
+    @ApiResponse({
+        status: 200,
+        description: "Delete a user",
+    })
+    @ApiResponse({ status: 404, description: "User not found" })
+    async deleteUser(@Param("id") id: string) {
+        const result = await this.userService.deleteUser(id);
+        return mapUserResponse(result);
+    }
+
+    /**
+     * Block a user
+     * @param id - User ID
+     * @returns Blocked user
+     */
+    @Patch(":id/block")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: "Block a user" })
+    @ApiResponse({
+        status: 200,
+        description: "User blocked successfully",
+    })
+    @ApiResponse({ status: 404, description: "User not found" })
+    async blockUser(@Param("id") id: string) {
+        const result = await this.userService.blockUser(id);
+        return mapUserResponse(result);
+    }
+
+    /**
+     * Upload user avatar
+     * @param id - User ID
+     * @param file - Avatar file
+     * @returns Upload result
+     */
+    @Post(":id/avatar")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @ApiBearerAuth()
+    @UseInterceptors(FileInterceptor("file"))
+    @ApiOperation({ summary: "Upload user avatar" })
+    @ApiConsumes("multipart/form-data")
+    @ApiResponse({
+        status: 200,
+        description: "Avatar uploaded successfully",
+    })
+    @ApiResponse({ status: 400, description: "Bad request or invalid file" })
+    @ApiResponse({ status: 404, description: "User not found" })
+    async uploadAvatar(@Param("id") id: string, @UploadedFile() file: any) {
+        return this.userService.uploadAvatar(id, file);
+    }
+
+}

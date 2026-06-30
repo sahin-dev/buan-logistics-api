@@ -8,7 +8,7 @@ import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
 
 @Injectable()
 export class BranchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async createBranch(dto: CreateBranchDto) {
     return this.prisma.branch.create({
@@ -22,11 +22,11 @@ export class BranchService {
 
     const where: any = search
       ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { city: { contains: search, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
+        ],
+      }
       : {};
 
     const [data, totalItems] = await Promise.all([
@@ -95,11 +95,11 @@ export class BranchService {
 
     const where: any = search
       ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { address: { contains: search, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { address: { contains: search, mode: 'insensitive' } },
+        ],
+      }
       : {};
 
     const [data, totalItems] = await Promise.all([

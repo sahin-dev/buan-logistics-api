@@ -10,6 +10,8 @@ import { ApplyUpgradeDto } from "./dtos/apply-upgrade.dto";
 import { UpdateUpgradeApplicationDto } from "./dtos/update-upgrade-application.dto";
 import { UpdateHubProviderApplicationDto } from "./dtos/update-hub-provider-application.dto";
 import { UpdateCorporatePartnerApplicationDto } from "./dtos/update-corporate-partner-application.dto";
+import { CreateAddressDto } from "./dtos/create-address.dto";
+import { UpdateAddressDto } from "./dtos/update-address.dto";
 
 @Injectable()
 export class UserService {
@@ -334,12 +336,12 @@ export class UserService {
 
             const where: any = search
                 ? {
-                      OR: [
-                          { email: { contains: search, mode: 'insensitive' } },
-                          { profile: { firstName: { contains: search, mode: 'insensitive' } } },
-                          { profile: { lastName: { contains: search, mode: 'insensitive' } } },
-                      ],
-                  }
+                    OR: [
+                        { email: { contains: search, mode: 'insensitive' } },
+                        { profile: { firstName: { contains: search, mode: 'insensitive' } } },
+                        { profile: { lastName: { contains: search, mode: 'insensitive' } } },
+                    ],
+                }
                 : {};
 
             const [users, totalItems] = await Promise.all([
@@ -570,6 +572,8 @@ export class UserService {
     async getUpgradeApplications(query: PaginationQueryDto) {
         const { page, limit } = query;
         const skip = query.getSkip();
+
+        console.log("asdfghgfghfd")
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.upgradeApplication.findMany({
@@ -970,87 +974,392 @@ export class UserService {
     }
 
     async updateUpgradeApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateUpgradeApplicationDto) {
-        const app = await this.prismaService.upgradeApplication.findUnique({
-            where: { id },
-        });
-        if (!app) {
-            throw new NotFoundException(`Upgrade application with ID ${id} not found`);
-        }
+        try {
+            const app = await this.prismaService.upgradeApplication.findUnique({
+                where: { id },
+            });
+            if (!app) {
+                throw new NotFoundException(`Upgrade application with ID ${id} not found`);
+            }
 
-        if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
-            throw new ForbiddenException('You can only update your own application');
-        }
+            if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+                throw new ForbiddenException('You can only update your own application');
+            }
 
-        const updateData: any = { ...dto };
-        if (requesterRole !== 'ADMIN') {
-            delete updateData.status;
-            delete updateData.notes;
-        }
+            const updateData: any = { ...dto };
+            if (requesterRole !== 'ADMIN') {
+                delete updateData.status;
+                delete updateData.notes;
+            }
 
-        return this.prismaService.upgradeApplication.update({
-            where: { id },
-            data: updateData,
-        });
+            return await this.prismaService.upgradeApplication.update({
+                where: { id },
+                data: updateData,
+            });
+        } catch (error) {
+            this.logger.error(`Error updating upgrade application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update upgrade application");
+        }
     }
 
     async updateHubProviderApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateHubProviderApplicationDto) {
-        const app = await this.prismaService.hubProviderApplication.findUnique({
-            where: { id },
-        });
-        if (!app) {
-            throw new NotFoundException(`Hub provider application with ID ${id} not found`);
-        }
-
-        if (requesterRole !== 'ADMIN') {
-            const user = await this.prismaService.user.findUnique({
-                where: { id: requesterId },
-                select: { email: true },
+        try {
+            const app = await this.prismaService.hubProviderApplication.findUnique({
+                where: { id },
             });
-            if (!user || (app.ownerEmail !== user.email && app.email !== user.email)) {
-                throw new ForbiddenException('You can only update your own application');
+            if (!app) {
+                throw new NotFoundException(`Hub provider application with ID ${id} not found`);
             }
-        }
 
-        const updateData: any = { ...dto };
-        if (dto.email_active_window_from) {
-            updateData.email_active_window_from = new Date(dto.email_active_window_from);
-        }
-        if (dto.email_active_window_to) {
-            updateData.email_active_window_to = new Date(dto.email_active_window_to);
-        }
+            if (requesterRole !== 'ADMIN') {
+                const user = await this.prismaService.user.findUnique({
+                    where: { id: requesterId },
+                    select: { email: true },
+                });
+                if (!user || (app.ownerEmail !== user.email && app.email !== user.email)) {
+                    throw new ForbiddenException('You can only update your own application');
+                }
+            }
 
-        if (requesterRole !== 'ADMIN') {
-            delete updateData.status;
-            delete updateData.rejection_notes;
-        }
+            const updateData: any = { ...dto };
+            if (dto.email_active_window_from) {
+                updateData.email_active_window_from = new Date(dto.email_active_window_from);
+            }
+            if (dto.email_active_window_to) {
+                updateData.email_active_window_to = new Date(dto.email_active_window_to);
+            }
 
-        return this.prismaService.hubProviderApplication.update({
-            where: { id },
-            data: updateData,
-        });
+            if (requesterRole !== 'ADMIN') {
+                delete updateData.status;
+                delete updateData.rejection_notes;
+            }
+
+            return await this.prismaService.hubProviderApplication.update({
+                where: { id },
+                data: updateData,
+            });
+        } catch (error) {
+            this.logger.error(`Error updating hub provider application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update hub provider application");
+        }
     }
 
     async updateCorporatePartnerApplication(id: string, requesterId: string, requesterRole: string, dto: UpdateCorporatePartnerApplicationDto) {
-        const app = await this.prismaService.corporatePartnerApplication.findUnique({
-            where: { id },
-        });
-        if (!app) {
-            throw new NotFoundException(`Corporate partner application with ID ${id} not found`);
-        }
+        try {
+            const app = await this.prismaService.corporatePartnerApplication.findUnique({
+                where: { id },
+            });
+            if (!app) {
+                throw new NotFoundException(`Corporate partner application with ID ${id} not found`);
+            }
 
-        if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
-            throw new ForbiddenException('You can only update your own application');
-        }
+            if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+                throw new ForbiddenException('You can only update your own application');
+            }
 
-        const updateData: any = { ...dto };
-        if (requesterRole !== 'ADMIN') {
-            delete updateData.status;
-            delete updateData.rejectionNotes;
-        }
+            const updateData: any = { ...dto };
+            if (requesterRole !== 'ADMIN') {
+                delete updateData.status;
+                delete updateData.rejectionNotes;
+            }
 
-        return this.prismaService.corporatePartnerApplication.update({
-            where: { id },
-            data: updateData,
-        });
+            return await this.prismaService.corporatePartnerApplication.update({
+                where: { id },
+                data: updateData,
+            });
+        } catch (error) {
+            this.logger.error(`Error updating corporate partner application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update corporate partner application");
+        }
     }
+
+
+
+    async getUpgradeApplication(id: string, requesterId: string, requesterRole: string) {
+        try {
+            const app = await this.prismaService.upgradeApplication.findUnique({
+                where: { id },
+            });
+            if (!app) {
+                throw new NotFoundException(`Upgrade application with ID ${id} not found`);
+            }
+
+            if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+                throw new ForbiddenException('You can only update your own application');
+            }
+
+
+            return await this.prismaService.upgradeApplication.findUnique({
+                where: { id },
+                include: {
+                    user: true,
+                },
+
+            });
+        } catch (error) {
+            this.logger.error(`Error updating upgrade application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update upgrade application");
+        }
     }
+
+    async getHubProviderApplication(id: string, requesterId: string, requesterRole: string) {
+        try {
+            const app = await this.prismaService.hubProviderApplication.findUnique({
+                where: { id },
+            });
+            if (!app) {
+                throw new NotFoundException(`Hub provider application with ID ${id} not found`);
+            }
+
+            if (requesterRole !== 'ADMIN') {
+                const user = await this.prismaService.user.findUnique({
+                    where: { id: requesterId },
+                    select: { email: true },
+                });
+                if (!user || (app.ownerEmail !== user.email && app.email !== user.email)) {
+                    throw new ForbiddenException('You can only update your own application');
+                }
+            }
+
+
+            return await this.prismaService.hubProviderApplication.findUnique({
+                where: { id },
+            });
+        } catch (error) {
+            this.logger.error(`Error updating hub provider application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update hub provider application");
+        }
+    }
+
+    async getCorporatePartnerApplication(id: string, requesterId: string, requesterRole: string) {
+        try {
+            const app = await this.prismaService.corporatePartnerApplication.findUnique({
+                where: { id },
+            });
+            if (!app) {
+                throw new NotFoundException(`Corporate partner application with ID ${id} not found`);
+            }
+
+            if (requesterRole !== 'ADMIN' && app.userId !== requesterId) {
+                throw new ForbiddenException('You can only update your own application');
+            }
+
+
+
+            return await this.prismaService.corporatePartnerApplication.findUnique({
+                where: { id },
+                include: {
+                    user: true,
+                },
+            });
+        } catch (error) {
+            this.logger.error(`Error updating corporate partner application ${id}:`, error);
+            if (error instanceof NotFoundException || error instanceof ForbiddenException) {
+                throw error;
+            }
+            throw new InternalServerErrorException("Failed to update corporate partner application");
+        }
+    }
+
+    /**
+     * Get all addresses for a user
+     */
+    async getAddresses(userId: string) {
+        try {
+            return await this.prismaService.userAddress.findMany({
+                where: { userId },
+                orderBy: { createdAt: "desc" },
+            });
+        } catch (error) {
+            this.logger.error(`Error fetching addresses for user ${userId}:`, error);
+            throw new InternalServerErrorException("Failed to fetch addresses");
+        }
+    }
+
+    /**
+     * Add a new address for a user
+     */
+    async addAddress(userId: string, dto: CreateAddressDto) {
+        try {
+            const isDefault = dto.isDefault || false;
+
+            return await this.prismaService.$transaction(async (tx) => {
+                if (isDefault) {
+                    // Reset all other addresses of the user to non-default
+                    await tx.userAddress.updateMany({
+                        where: { userId },
+                        data: { isDefault: false },
+                    });
+                }
+
+                return await tx.userAddress.create({
+                    data: {
+                        userId,
+                        title: dto.title,
+                        address: dto.address,
+                        isDefault,
+                    },
+                });
+            });
+        } catch (error) {
+            this.logger.error(`Error adding address for user ${userId}:`, error);
+            throw new InternalServerErrorException("Failed to add address");
+        }
+    }
+
+    /**
+     * Update user address
+     */
+    async updateAddress(userId: string, addressId: string, dto: UpdateAddressDto) {
+        try {
+            const address = await this.prismaService.userAddress.findFirst({
+                where: { id: addressId, userId },
+            });
+
+            if (!address) {
+                throw new NotFoundException(`Address with ID ${addressId} not found`);
+            }
+
+            const isDefault = dto.isDefault !== undefined ? dto.isDefault : address.isDefault;
+
+            return await this.prismaService.$transaction(async (tx) => {
+                if (dto.isDefault) {
+                    // Reset all other addresses of the user to non-default
+                    await tx.userAddress.updateMany({
+                        where: { userId },
+                        data: { isDefault: false },
+                    });
+                }
+
+                return await tx.userAddress.update({
+                    where: { id: addressId },
+                    data: {
+                        title: dto.title,
+                        address: dto.address,
+                        isDefault,
+                    },
+                });
+            });
+        } catch (error) {
+            this.logger.error(`Error updating address ${addressId} for user ${userId}:`, error);
+            if (error instanceof NotFoundException) throw error;
+            throw new InternalServerErrorException("Failed to update address");
+        }
+    }
+
+    /**
+     * Delete user address
+     */
+    async deleteAddress(userId: string, addressId: string) {
+        try {
+            const address = await this.prismaService.userAddress.findFirst({
+                where: { id: addressId, userId },
+            });
+
+            if (!address) {
+                throw new NotFoundException(`Address with ID ${addressId} not found`);
+            }
+
+            await this.prismaService.userAddress.delete({
+                where: { id: addressId },
+            });
+
+            return { success: true, message: "Address deleted successfully" };
+        } catch (error) {
+            this.logger.error(`Error deleting address ${addressId} for user ${userId}:`, error);
+            if (error instanceof NotFoundException) throw error;
+            throw new InternalServerErrorException("Failed to delete address");
+        }
+    }
+
+    /**
+     * Search user by email for shipment creation lookup
+     */
+    async lookupByEmail(email: string) {
+        try {
+            const user = await this.prismaService.user.findUnique({
+                where: { email },
+                select: {
+                    id: true,
+                    email: true,
+                    profile: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                            phone: true,
+                        },
+                    },
+                    addresses: {
+                        where: { isDefault: true },
+                        take: 1,
+                    },
+                },
+            });
+
+            if (!user) {
+                return { registered: false };
+            }
+
+            return {
+                registered: true,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.profile?.firstName,
+                    lastName: user.profile?.lastName,
+                    phone: user.profile?.phone,
+                    defaultAddress: user.addresses[0] || null,
+                },
+            };
+        } catch (error) {
+            this.logger.error(`Error looking up user by email ${email}:`, error);
+            throw new InternalServerErrorException("Failed to lookup user by email");
+        }
+    }
+
+    /**
+     * Fetch user stats: number of addresses and shipment status counts
+     */
+    async getUserStats(userId: string) {
+        try {
+            const [addressCount, shipments] = await Promise.all([
+                this.prismaService.userAddress.count({
+                    where: { userId },
+                }),
+                this.prismaService.shipment.findMany({
+                    where: { senderId: userId },
+                    select: { current_status: true },
+                }),
+            ]);
+
+            const statusCounts: Record<string, number> = {};
+            for (const shipment of shipments) {
+                const status = shipment.current_status;
+                statusCounts[status] = (statusCounts[status] || 0) + 1;
+            }
+
+            return {
+                addressCount,
+                shipmentStatusCounts: statusCounts,
+            };
+        } catch (error) {
+            this.logger.error(`Error fetching stats for user ${userId}:`, error);
+            throw new InternalServerErrorException("Failed to fetch user stats");
+        }
+    }
+}

@@ -7,6 +7,8 @@ import { AuthResponseDto } from "./dtos/AuthResponseDto";
 import { ChangePasswordDto } from "./dtos/ChangePasswordDto";
 import { ForgotPasswordDto } from "./dtos/ForgotPasswordDto";
 import { ResetPasswordDto } from "./dtos/ResetPasswordDto";
+import { VerifyOtpDto } from "./dtos/VerifyOtpDto";
+import { ResetPasswordNewDto } from "./dtos/ResetPasswordNewDto";
 import { JwtAuthGuard } from "src/common/guards/auth.guard";
 
 @ApiTags("Authentication")
@@ -80,6 +82,19 @@ export class AuthController {
     }
 
     /**
+     * Resend password reset OTP code
+     */
+    @Post("resend-otp")
+    @ApiOperation({ summary: "Resend password reset OTP code" })
+    @ApiResponse({ status: 200, description: "If the email is registered, a new password reset code has been sent" })
+    @ApiResponse({ status: 400, description: "Bad request" })
+    async resendOtp(
+        @Body() forgotPasswordDto: ForgotPasswordDto,
+    ) {
+        return this.authService.resendOtp(forgotPasswordDto.email);
+    }
+
+    /**
      * Reset password using OTP code
      */
     @Post("reset-password")
@@ -90,6 +105,36 @@ export class AuthController {
         @Body() resetPasswordDto: ResetPasswordDto,
     ) {
         return this.authService.resetPassword(resetPasswordDto);
+    }
+
+    /**
+     * Verify OTP code
+     */
+    @Post("verify-otp")
+    @ApiOperation({ summary: "Verify password reset OTP code" })
+    @ApiResponse({ status: 200, description: "OTP is valid" })
+    @ApiResponse({ status: 400, description: "Bad request" })
+    async verifyOtp(
+        @Body() verifyOtpDto: VerifyOtpDto,
+    ) {
+        return this.authService.verifyOtp(verifyOtpDto.token);
+    }
+
+    /**
+     * Reset password using newPassword and confirmPassword after OTP verification
+     */
+    @Post("reset-password-new")
+    @ApiOperation({ summary: "Reset password using new password and confirm password" })
+    @ApiResponse({ status: 200, description: "Password has been reset successfully" })
+    @ApiResponse({ status: 400, description: "Bad request" })
+    async resetPasswordNew(
+        @Body() resetPasswordNewDto: ResetPasswordNewDto,
+    ) {
+        return this.authService.resetPasswordNew(
+            resetPasswordNewDto.token,
+            resetPasswordNewDto.newPassword,
+            resetPasswordNewDto.confirmPassword,
+        );
     }
 
     /**

@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateBranchDto {
   @ApiProperty({ example: 'Dhaka Branch' })
@@ -16,4 +17,17 @@ export class CreateBranchDto {
   @IsNotEmpty()
   @IsString()
   city: string;
+
+  @ApiPropertyOptional({ example: 23.8103, description: 'Latitude for map display' })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 90.4125, description: 'Longitude for map display' })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  longitude?: number;
 }
+

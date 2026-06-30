@@ -6,39 +6,37 @@ export class RegisterUserDto {
     @IsString()
     @IsNotEmpty()
     @ApiProperty({
-       example:"John"
+        example: "John"
     })
-    firstName:string
+    firstName: string
 
     @IsString()
     @IsNotEmpty()
     @ApiProperty({
-        example:"Doe"
+        example: "Doe"
     })
-    lastName:string
-    
+    lastName: string
+
     @IsEmail()
     @IsNotEmpty()
     @ApiProperty({
-        example:"johndoe@yopmail.com"
+        example: "johndoe@yopmail.com"
     })
-    email:string
+    email: string
 
     @IsString()
     @IsNotEmpty()
-    @IsStrongPassword()
     @ApiProperty({
-        example:"password1234!"
+        example: "password1234!"
     })
-    password:string
+    password: string
 
     @IsString()
     @IsNotEmpty()
-    @IsStrongPassword()
     @ApiProperty({
-        example:"password1234"
+        example: "password1234!"
     })
-    confirmPassword:string
+    confirmPassword: string
 
     @IsString()
     @IsOptional()

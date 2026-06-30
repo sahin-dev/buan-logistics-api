@@ -4,6 +4,7 @@ import { IsEnum, IsString, IsNotEmpty, IsOptional } from "class-validator";
 
 export class ReviewApplicationDto {
     @ApiProperty({
+        enum: ApplicationStatus,
         example: ApplicationStatus.Accepted,
         description: "Application status",
     })
@@ -14,9 +15,9 @@ export class ReviewApplicationDto {
     @ApiProperty({
         example: "Application approved",
         description: "Notes",
+        required: false
     })
     @IsString()
-    @IsNotEmpty()
     @IsOptional()
     notes?: string
 }

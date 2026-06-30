@@ -20,6 +20,7 @@ model User {
     notifications       Notification[]
     referrals           Referral[]           @relation("Referrals")
     referredBy          Referral?            @relation("ReferredBy")
+    addresses           UserAddress[]        @relation("UserAddresses")
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
@@ -235,3 +236,17 @@ model PasswordResetToken {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("password_reset_tokens")
 }
+
+model UserAddress {
+    id        String   @id @default(uuid())
+    userId    String
+    title     String   // e.g. "Home", "Office"
+    address   String
+    isDefault Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation("UserAddresses", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("user_addresses")
+}
