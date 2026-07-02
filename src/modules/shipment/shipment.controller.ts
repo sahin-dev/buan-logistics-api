@@ -5,7 +5,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
-  ApiBody, ApiConsumes,
+  ApiBody, ApiConsumes, ApiQuery, ApiParam,
 } from '@nestjs/swagger';
 import { ShipmentService } from './shipment.service';
 import { FileUploadService } from '../file-upload/file-upload.service';
@@ -166,9 +166,139 @@ export class ShipmentController {
   @Get('my')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all shipments for the logged-in customer (paginated, supports ?page=1&limit=10)' })
+  @ApiOperation({ summary: 'Get all shipments for the logged-in customer (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by tracking number, receiver name, or address' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by shipment status' })
+  @ApiQuery({ name: 'shipmentType', required: false, type: String, description: 'Filter by shipment mode/type' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getMyShipments(@Request() req: any, @Query() query: PaginationQueryDto) {
     return this.shipmentService.getMyShipments(req.payload.userId, query);
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all shipments for admin (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by tracking number, receiver name, address, or sender email' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by shipment status' })
+  @ApiQuery({ name: 'shipmentType', required: false, type: String, description: 'Filter by shipment mode/type' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
+  async getAllShipmentsForAdmin(@Query() query: PaginationQueryDto) {
+    return this.shipmentService.getAllShipmentsForAdmin(query);
+  }
+
+  @Get('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Shipment ID (UUID)', example: 'shipment-uuid-123' })
+  @ApiOperation({
+    summary: 'Get a single shipment details (Admin only)',
+    description: 'Retrieves complete details of a specific shipment including timeline, invoices, rewards, and container information. Requires admin privileges.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipment retrieved successfully',
+    schema: {
+      example: {
+        id: 'shipment-uuid-123',
+        shipment_number: 'BN-2026-123456',
+        tracking_number: 'TRK-2026-789012',
+        senderId: 'sender-uuid',
+        receiverName: 'John Doe',
+        receiverPhone: '1234567890',
+        receiverAddress: '123 Main St, City, State 12345',
+        weight: 2.5,
+        current_status: 'IN_TRANSIT',
+        type: 'STANDARD',
+        shipmentType: 'STANDARD',
+        cost: 50.0,
+        hubId: 'hub-uuid',
+        branchId: 'branch-uuid',
+        containerId: null,
+        createdAt: '2026-07-02T10:30:00Z',
+        updatedAt: '2026-07-02T11:45:00Z',
+        timeline: [
+          {
+            id: 'timeline-uuid-1',
+            shipmentId: 'shipment-uuid-123',
+            status: 'AT_HUB',
+            notes: 'Shipment received at hub',
+            photoUrls: [],
+            timestamp: '2026-07-02T10:30:00Z',
+            createdAt: '2026-07-02T10:30:00Z'
+          },
+          {
+            id: 'timeline-uuid-2',
+            shipmentId: 'shipment-uuid-123',
+            status: 'IN_TRANSIT',
+            notes: 'Shipment picked up and in transit',
+            photoUrls: ['https://example.com/photo1.jpg'],
+            timestamp: '2026-07-02T11:00:00Z',
+            createdAt: '2026-07-02T11:00:00Z'
+          }
+        ],
+        invoices: [
+          {
+            id: 'invoice-uuid-1',
+            shipmentId: 'shipment-uuid-123',
+            amount: 50.0,
+            remaining_amount: 0.0,
+            status: 'PAID',
+            createdAt: '2026-07-02T10:30:00Z',
+            updatedAt: '2026-07-02T10:30:00Z'
+          }
+        ],
+        rewards: [
+          {
+            id: 'reward-uuid-1',
+            shipmentId: 'shipment-uuid-123',
+            userId: 'user-uuid',
+            type: 'MILESTONE',
+            value: 500.0,
+            redeemed: false,
+            createdAt: '2026-07-02T10:30:00Z'
+          }
+        ],
+        hub: {
+          id: 'hub-uuid',
+          name: 'Main Hub',
+          location: 'City Center',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z'
+        },
+        branch: {
+          id: 'branch-uuid',
+          name: 'Downtown Branch',
+          location: 'Downtown Area',
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z'
+        },
+        sender: {
+          id: 'sender-uuid',
+          email: 'sender@example.com',
+          profile: {
+            id: 'profile-uuid',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            phone: '9876543210',
+            avatar: null,
+            location: 'Original City',
+            address: 'Sender Address'
+          }
+        },
+        container: null
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Shipment not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
+  async getShipmentById(@Param('id') id: string) {
+    return this.shipmentService.getShipmentById(id);
   }
 
   @Get('track/:trackingNumber')

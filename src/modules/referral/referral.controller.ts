@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ReferralService } from './referral.service';
 import { JwtAuthGuard } from 'src/common/guards/auth.guard';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
@@ -19,7 +19,11 @@ export class ReferralController {
   }
 
   @Get('my')
-  @ApiOperation({ summary: 'Get list of referrals sent by the logged-in user (paginated, supports ?page=1&limit=10)' })
+  @ApiOperation({ summary: 'Get list of referrals sent by the logged-in user (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by referred email' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by referral status' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getMyReferrals(@Request() req: any, @Query() query: PaginationQueryDto) {
     const userId = req.payload.userId;
     return this.referralService.getMyReferrals(userId, query);

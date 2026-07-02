@@ -65,10 +65,20 @@ export class InvoiceService {
   }
 
   async getInvoicesByUserId(userId: string, query: PaginationQueryDto) {
-    const { page, limit } = query;
+    const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
-    const where = { userId };
+    const where: any = {
+      userId,
+      ...(search ? { invoice_number: { contains: search, mode: 'insensitive' } } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
     const [data, totalItems] = await Promise.all([
       this.prisma.invoice.findMany({
         where,

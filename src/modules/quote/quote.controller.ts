@@ -10,7 +10,7 @@ import {
     UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth, ApiBody, ApiQuery } from "@nestjs/swagger";
 import { QuoteService } from "./quote.service";
 import { CreateQuoteDto } from "./dtos/create-quote.dto";
 import { ReplyQuoteDto } from "./dtos/reply-quote.dto";
@@ -50,7 +50,11 @@ export class QuoteController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Get all submitted quote requests (Admin only, paginated)" })
+    @ApiOperation({ summary: "Get all submitted quote requests (Admin only, paginated, supports search and filters)" })
+    @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by customer name, email, phone, or pickup details' })
+    @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by quote status' })
+    @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+    @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
     @ApiResponse({ status: 200, description: "Successfully retrieved list of quotes" })
     @ApiResponse({ status: 401, description: "Unauthorized" })
     @ApiResponse({ status: 403, description: "Forbidden" })

@@ -1,0 +1,517 @@
+import "dotenv/config";
+import { randomUUID } from "crypto";
+import bcrypt from "bcrypt";
+import { PrismaPg } from "@prisma/adapter-pg";
+import {
+  ApplicationStatus,
+  BillingCycle,
+  CommissionStatus,
+  ContainerStatus,
+  ContainerType,
+  InvoiceStatus,
+  NotificationType,
+  PaymentMethod,
+  PaymentStatus,
+  PaymentType,
+  PrismaClient,
+  QuoteStatus,
+  ReferralStatus,
+  RewardSource,
+  RewardType,
+  ShipmentMode,
+  ShipmentStatus,
+  ShipmentType,
+  Tier,
+  Role,
+  OperationMode,
+} from "../generated/prisma/client";
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+  }),
+});
+
+async function main() {
+  const now = new Date();
+  const hashedPassword = await bcrypt.hash("Password123!", 10);
+  const adminHashedPassword = await bcrypt.hash("admin1234", 10);
+  const hubProviderHashedPassword = await bcrypt.hash("hubprovider123", 10);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.hubCommission.deleteMany();
+    await tx.userRewardProgress.deleteMany();
+    await tx.rewardRule.deleteMany();
+    await tx.reward.deleteMany();
+    await tx.payment.deleteMany();
+    await tx.invoice.deleteMany();
+    await tx.shipmentTimeline.deleteMany();
+    await tx.shipment.deleteMany();
+    await tx.container.deleteMany();
+    await tx.hub.deleteMany();
+    await tx.branch.deleteMany();
+    await tx.notification.deleteMany();
+    await tx.passwordResetToken.deleteMany();
+    await tx.userAddress.deleteMany();
+    await tx.referral.deleteMany();
+    await tx.upgradeApplication.deleteMany();
+    await tx.hubProviderProfile.deleteMany();
+    await tx.hubProviderApplication.deleteMany();
+    await tx.corporatePartnerApplication.deleteMany();
+    await tx.corporatePartnerProfile.deleteMany();
+    await tx.businessProfile.deleteMany();
+    await tx.userProfile.deleteMany();
+    await tx.user.deleteMany();
+    await tx.quote.deleteMany();
+
+    const adminUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "admin@buanenterprise.com",
+        password:adminHashedPassword,
+        provider: "local",
+        tier: Tier.T1,
+        role: Role.ADMIN,
+      },
+    });
+
+    const customerUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "customer@angel1951.test",
+        password: hashedPassword,
+        provider: "local",
+        tier: Tier.T2,
+        role: Role.USER,
+      },
+    });
+
+    const corporateUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "corporate@angel1951.test",
+        password: hashedPassword,
+        provider: "local",
+        tier: Tier.T3,
+        role: Role.CORPORATE_PARTNER,
+      },
+    });
+
+    const hubProviderUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "branch@buanenterprise.com",
+        password: hubProviderHashedPassword,
+        provider: "local",
+        tier: Tier.T2,
+        role: Role.HUB_PROIVDER,
+      },
+    });
+
+    await tx.userProfile.create({
+      data: {
+        userId: customerUser.id,
+        firstName: "Ada",
+        lastName: "Lovelace",
+        location: "Lagos",
+        phone: "+2348000000000",
+        address: "12 Sample Drive",
+      },
+    });
+
+    await tx.businessProfile.create({
+      data: {
+        userId: customerUser.id,
+        autorizedPersonFullName: "Ada Lovelace",
+        authorizedPersonTitle: "Operations Lead",
+        companyName: "Bright Logistics",
+        tradingName: "Bright Logistics",
+        Reg_no: "REG-1001",
+        country: "Nigeria",
+        address: "5 Market Street",
+        email: "ops@brightlogistics.test",
+        phone: "+2348000000001",
+        website: "https://brightlogistics.test",
+        type: "Logistics",
+        status: ApplicationStatus.Pending,
+        operation_mode: OperationMode.Both,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await tx.corporatePartnerProfile.create({
+      data: {
+        userId: corporateUser.id,
+        companyName: "Blue Ocean Cargo",
+        tradingName: "Blue Ocean",
+        regNo: "CP-9001",
+        country: "Kenya",
+        address: "88 Harbor Road",
+        yearsInOperation: "6",
+        contactName: "Moses Kibet",
+        contactPosition: "Supply Chain Director",
+        contactPhone: "+254700000000",
+        contactEmail: "moses@blueocean.test",
+        website: "https://blueocean.test",
+        businessNature: ["Freight", "Warehousing"],
+        countriesOperateFrom: "Kenya",
+        countriesShipTo: "Uganda",
+        cargoTypes: ["General Cargo", "Perishables"],
+        estimatedMonthlyVolume: "250",
+        servicesRequired: "Express Delivery",
+        billingCycle: BillingCycle.MONTHLY,
+      },
+    });
+
+    await tx.corporatePartnerApplication.create({
+      data: {
+        userId: corporateUser.id,
+        companyName: "Blue Ocean Cargo",
+        tradingName: "Blue Ocean",
+        regNo: "CP-9001",
+        country: "Kenya",
+        address: "88 Harbor Road",
+        yearsInOperation: "6",
+        contactName: "Moses Kibet",
+        contactPosition: "Supply Chain Director",
+        contactPhone: "+254700000000",
+        contactEmail: "moses@blueocean.test",
+        website: "https://blueocean.test",
+        businessNature: ["Freight", "Warehousing"],
+        countriesOperateFrom: "Kenya",
+        countriesShipTo: "Uganda",
+        cargoTypes: ["General Cargo", "Perishables"],
+        estimatedMonthlyVolume: "250",
+        servicesRequired: "Express Delivery",
+        status: ApplicationStatus.Pending,
+      },
+    });
+
+    await tx.hubProviderProfile.create({
+      data: {
+        userId: hubProviderUser.id,
+      },
+    });
+
+    await tx.hubProviderApplication.create({
+      data: {
+        shopName: "City Hub Station",
+        address: "14 Market Avenue",
+        landmark: "Near Central Mosque",
+        cityOrState: "Lagos",
+        contact: "+2348000000011",
+        email: "hub@angel1951.test",
+        cctvAvailable: true,
+        ownerName: "Kelechi Okafor",
+        ownerEmail: "kelechi@angel1951.test",
+        prefferedContactMethod: "Phone",
+        operatingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        email_active_window_from: new Date("2026-01-01T08:00:00.000Z"),
+        email_active_window_to: new Date("2026-01-01T18:00:00.000Z"),
+        daily_minimum_staff: 3,
+        daily_maximum_staff: 8,
+        daily_foot_traffic: "High",
+        handledDeliveryServiceBefore: true,
+        atLeastSixMonthCommitted: true,
+        comments: "Ideal for urban pickup operations",
+        image_urls: ["https://example.com/hub-1.jpg"],
+        status: ApplicationStatus.Pending,
+      },
+    });
+
+    await tx.upgradeApplication.create({
+      data: {
+        userId: customerUser.id,
+        targetTier: Tier.T3,
+        status: ApplicationStatus.Pending,
+        notes: "Requested higher tier coverage",
+        companyName: "Bright Logistics",
+        tradingName: "Bright Logistics",
+        Reg_no: "REG-1001",
+        country: "Nigeria",
+        address: "5 Market Street",
+        email: "ops@brightlogistics.test",
+        phone: "+2348000000001",
+        website: "https://brightlogistics.test",
+        type: "Logistics",
+        operation_mode: OperationMode.Both,
+        yearsInOperation: "5",
+        contactName: "Ada Lovelace",
+        contactPosition: "Operations Lead",
+        contactPhone: "+2348000000000",
+        contactEmail: "ada@brightlogistics.test",
+        businessNature: ["Freight"],
+        countriesOperateFrom: "Nigeria",
+        countriesShipTo: "Ghana",
+        cargoTypes: ["General Cargo"],
+        estimatedMonthlyVolume: "100",
+        servicesRequired: "Priority Shipping",
+      },
+    });
+
+    await tx.referral.create({
+      data: {
+        id: randomUUID(),
+        referrerUserId: adminUser.id,
+        referredEmail: "newuser@angel1951.test",
+        referralCode: "REF-ANGEL-001",
+        status: ReferralStatus.PENDING,
+        rewardPoints: 25,
+      },
+    });
+
+    await tx.passwordResetToken.create({
+      data: {
+        userId: customerUser.id,
+        token: "seed-reset-token-123",
+        expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await tx.userAddress.create({
+      data: {
+        userId: customerUser.id,
+        title: "Home",
+        address: "12 Sample Drive, Lagos",
+        isDefault: true,
+      },
+    });
+
+    const branch = await tx.branch.create({
+      data: {
+        id: randomUUID(),
+        name: "Lagos Main Branch",
+        address: "1 Marina Road",
+        city: "Lagos",
+        latitude: 6.5244,
+        longitude: 3.3792,
+      },
+    });
+
+    const hub = await tx.hub.create({
+      data: {
+        id: randomUUID(),
+        name: "Lagos Transit Hub",
+        address: "7 Ikorodu Road",
+        branchId: branch.id,
+        hubProviderId: hubProviderUser.id,
+        commissionPerPackage: 5.5,
+      },
+    });
+
+    const container = await tx.container.create({
+      data: {
+        id: randomUUID(),
+        containerNumber: "CTR-1001",
+        size: "40ft",
+        type: ContainerType.FULL,
+        branchId: branch.id,
+        status: ContainerStatus.LOADING,
+      },
+    });
+
+    const shipment = await tx.shipment.create({
+      data: {
+        id: randomUUID(),
+        shipment_number: "BN-2026-000001",
+        senderId: customerUser.id,
+        receiverName: "Grace Thompson",
+        receiverPhone: "+2348000000002",
+        receiverAddress: "21 Harbor Street",
+        weight: 12.5,
+        description: "Electronics parcel",
+        packageDetails: { dimensions: "40x30x20", category: "electronics" },
+        containerDetails: { containerType: "FULL" },
+        hubId: hub.id,
+        branchId: branch.id,
+        cost: 120.75,
+        shipped_at: now,
+        delivered_at: now,
+        current_status: ShipmentStatus.DELIVERED,
+        type: ShipmentType.EXPRESS,
+        shipmentType: ShipmentMode.AIR_CARGO,
+        pickupContactName: "Ada Lovelace",
+        pickupContactPhone: "+2348000000000",
+        pickupAddress: "12 Sample Drive",
+        scheduledPickupDate: now,
+        containerId: container.id,
+      },
+    });
+
+    await tx.shipmentTimeline.create({
+      data: {
+        shipmentId: shipment.id,
+        status: ShipmentStatus.PENDING,
+        notes: "Shipment created and prepared for pickup",
+        photo_urls: ["https://example.com/label-1.jpg"],
+      },
+    });
+
+    await tx.shipmentTimeline.create({
+      data: {
+        shipmentId: shipment.id,
+        status: ShipmentStatus.IN_TRANSIT,
+        notes: "Parcel is on the way to the destination",
+      },
+    });
+
+    const invoice = await tx.invoice.create({
+      data: {
+        id: randomUUID(),
+        invoice_number: "INV-1001",
+        amount: 120.75,
+        remaining_amount: 120.75,
+        status: InvoiceStatus.PENDING,
+        payment_type: PaymentType.FULL,
+        due_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        shipmentId: shipment.id,
+        userId: customerUser.id,
+        discountAmount: 0,
+        rewardNote: null,
+      },
+    });
+
+    await tx.payment.create({
+      data: {
+        id: randomUUID(),
+        invoiceId: invoice.id,
+        amount: 120.75,
+        status: PaymentStatus.PENDING,
+        method: PaymentMethod.BANK_TRANSFER,
+        transactionId: "TXN-SEED-1001",
+        installmentNo: 1,
+      },
+    });
+
+    await tx.rewardRule.createMany({
+      data: [
+        {
+          rewardType: RewardType.AIR_CARGO,
+          name: "Air Cargo Reward",
+          description: "Unlocks after 2 air cargo deliveries",
+          thresholdCount: 2,
+          thresholdWeight: 0,
+          discountPercent: 10,
+          freeShipment: false,
+          freeKgLimit: 0,
+          isActive: true,
+        },
+        {
+          rewardType: RewardType.SEA_CARGO,
+          name: "Sea Cargo Reward",
+          description: "Unlocks after 3 sea cargo deliveries",
+          thresholdCount: 3,
+          thresholdWeight: 0,
+          discountPercent: 8,
+          freeShipment: false,
+          freeKgLimit: 0,
+          isActive: true,
+        },
+        {
+          rewardType: RewardType.KG_SHIPMENT,
+          name: "Kg Shipment Reward",
+          description: "Unlocks after 100kg shipped",
+          thresholdCount: 0,
+          thresholdWeight: 100,
+          discountPercent: 5,
+          freeShipment: false,
+          freeKgLimit: 0,
+          isActive: true,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    await tx.userRewardProgress.create({
+      data: {
+        userId: customerUser.id,
+        rewardType: RewardType.AIR_CARGO,
+        completedCount: 2,
+        completedWeight: 0,
+        available: true,
+        lastCompletedAt: now,
+      },
+    });
+
+    await tx.userRewardProgress.create({
+      data: {
+        userId: customerUser.id,
+        rewardType: RewardType.SEA_CARGO,
+        completedCount: 1,
+        completedWeight: 0,
+        available: false,
+        lastCompletedAt: now,
+      },
+    });
+
+    await tx.reward.create({
+      data: {
+        id: randomUUID(),
+        userId: customerUser.id,
+        shipmentId: shipment.id,
+        invoiceId: invoice.id,
+        source: RewardSource.SHIPMENT,
+        rewardType: RewardType.AIR_CARGO,
+        description: "Welcome shipment reward",
+        points: 10,
+        claimed: true,
+        claimedAt: now,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        id: randomUUID(),
+        userId: customerUser.id,
+        title: "Shipment created",
+        message: "Your shipment has been registered successfully",
+        type: NotificationType.SHIPMENT,
+        metadata: { shipmentId: shipment.id },
+      },
+    });
+
+    await tx.quote.create({
+      data: {
+        id: randomUUID(),
+        shipmentType: "Air Cargo",
+        country: "Nigeria",
+        pickupServices: "Doorstep",
+        fullName: "Ada Lovelace",
+        phone: "+2348000000000",
+        address: "12 Sample Drive",
+        whatWeArePickingUp: "Laptop",
+        email: "ada@brightlogistics.test",
+        shippingType: "Express",
+        weightOrVolume: "5kg",
+        receiverCountry: "Ghana",
+        receiverFullName: "Grace Thompson",
+        receiverPhone: "+233500000000",
+        receiverEmail: "grace@example.com",
+        receiverAddress: "21 Harbor Street",
+        status: QuoteStatus.PENDING,
+      },
+    });
+
+    await tx.hubCommission.create({
+      data: {
+        id: randomUUID(),
+        hubId: hub.id,
+        shipmentId: shipment.id,
+        amount: 5.5,
+        status: CommissionStatus.PENDING,
+      },
+    });
+  });
+
+  console.log("Seed data created successfully.");
+}
+
+main()
+  .catch((error) => {
+    console.error("Seed failed:", error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

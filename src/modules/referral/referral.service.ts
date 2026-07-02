@@ -58,10 +58,20 @@ export class ReferralService {
   }
 
   async getMyReferrals(userId: string, query: PaginationQueryDto) {
-    const { page, limit } = query;
+    const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
-    const where = { referrerUserId: userId };
+    const where: any = {
+      referrerUserId: userId,
+      ...(search ? { referredEmail: { contains: search, mode: 'insensitive' } } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
     const [data, totalItems] = await Promise.all([
       this.prisma.referral.findMany({
         where,

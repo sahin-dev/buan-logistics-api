@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationService } from './notification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmtpProvider } from 'src/common/providers/smtp.provider';
-import { NotificationType, ShipmentStatus } from 'generated/prisma/enums';
+import { NotificationType, ShipmentStatus, Role } from 'generated/prisma/enums';
 
 @Injectable()
 export class NotificationListener {
@@ -26,6 +26,74 @@ export class NotificationListener {
     }
   }
 
+  /**
+   * Get all admin users for system-wide notifications
+   */
+  private async getAllAdmins(): Promise<string[]> {
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: { role: Role.ADMIN },
+        select: { id: true },
+      });
+      return admins.map((admin) => admin.id);
+    } catch (error) {
+      this.logger.error('Failed to fetch admin users:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create notification for each admin user
+   */
+  private async notifyAdmins(
+    title: string,
+    message: string,
+    type: NotificationType,
+    metadata?: any,
+  ): Promise<void> {
+    try {
+      const adminIds = await this.getAllAdmins();
+      for (const adminId of adminIds) {
+        await this.notificationService.createNotification({
+          userId: adminId,
+          title,
+          message,
+          type,
+          metadata,
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to notify admins:', error);
+    }
+  }
+
+  // ─────────────────── User Events ──────────────────────
+
+  @OnEvent('user.registered')
+  async handleUserRegistered(payload: {
+    userId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+  }) {
+    try {
+      const { userId, email, firstName, lastName } = payload;
+      const userName = firstName && lastName ? `${firstName} ${lastName}` : email;
+
+      // Admin notification
+      await this.notifyAdmins(
+        'New User Registered',
+        `New user ${userName} (${email}) has registered on the platform.`,
+        NotificationType.SYSTEM,
+        { userId, email, userName },
+      );
+
+      this.logger.log(`Admin notified of new user registration: ${email}`);
+    } catch (error) {
+      this.logger.error('Failed to handle user.registered notification:', error);
+    }
+  }
+
   // ─────────────────── Shipment Events ─────────────────────
 
   @OnEvent('shipment.created')
@@ -33,8 +101,11 @@ export class NotificationListener {
     shipmentId: string;
     senderId: string;
     trackingNumber?: string;
+    shipment_number?: string;
+    receiverName?: string;
   }) {
     try {
+      // Customer notification
       await this.notificationService.createNotification({
         userId: payload.senderId,
         title: 'Shipment Created',
@@ -42,6 +113,26 @@ export class NotificationListener {
         type: NotificationType.SHIPMENT,
         metadata: { shipmentId: payload.shipmentId },
       });
+
+      // Get sender details for admin notification
+      const sender = await this.prisma.user.findUnique({
+        where: { id: payload.senderId },
+        select: { email: true, profile: true },
+      });
+
+      const senderName = sender?.profile
+        ? `${sender.profile.firstName} ${sender.profile.lastName}`
+        : sender?.email || 'Unknown User';
+
+      // Admin notification
+      await this.notifyAdmins(
+        'New Shipment Created',
+        `New shipment ${payload.shipment_number || payload.shipmentId} created by ${senderName} to ${payload.receiverName || 'receiver'}. Tracking: ${payload.trackingNumber || 'pending'}`,
+        NotificationType.SHIPMENT,
+        { shipmentId: payload.shipmentId, senderEmail: sender?.email, shipment_number: payload.shipment_number },
+      );
+
+      this.logger.log(`Admin notified of new shipment: ${payload.shipmentId}`);
     } catch (error) {
       this.logger.error('Failed to create shipment.created notification:', error);
     }
@@ -143,6 +234,7 @@ export class NotificationListener {
       const trackingMsg = trackingNumber ? ` Tracking number: ${trackingNumber}` : '';
       const message = `Payment of $${amountPaid.toFixed(2)} received for invoice ${invoiceNumber}. Remaining balance: $${remainingAmount.toFixed(2)}.${trackingMsg}`;
 
+      // User notification
       await this.notificationService.createNotification({
         userId,
         title: 'Payment Confirmed',
@@ -150,6 +242,27 @@ export class NotificationListener {
         type: NotificationType.INVOICE,
         metadata: { invoiceId, invoiceNumber, trackingNumber },
       });
+
+      // Get user details for admin notification
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, profile: true },
+      });
+
+      const userName = user?.profile
+        ? `${user.profile.firstName} ${user.profile.lastName}`
+        : user?.email || 'Unknown User';
+
+      // Admin notification for payments (especially large ones)
+      if (amountPaid >= 100) {
+        // Notify admins of payments $100 or more
+        await this.notifyAdmins(
+          'New Payment Received',
+          `Payment of $${amountPaid.toFixed(2)} received from ${userName} (${user?.email}) for invoice ${invoiceNumber}.`,
+          NotificationType.INVOICE,
+          { invoiceId, invoiceNumber, amountPaid, userName, userEmail: user?.email },
+        );
+      }
 
       // Email confirmation
       const email = await this.getUserEmail(userId);
@@ -188,6 +301,7 @@ export class NotificationListener {
     const { userId, applicationType } = payload;
     const label = applicationType === 'UPGRADE' ? 'Tier Upgrade' : applicationType === 'CORPORATE' ? 'Corporate Partner' : 'Hub Provider';
     try {
+      // User notification
       await this.notificationService.createNotification({
         userId,
         title: `${label} Application Submitted`,
@@ -195,6 +309,26 @@ export class NotificationListener {
         type: NotificationType.UPGRADE,
         metadata: payload,
       });
+
+      // Get user details for admin notification
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, profile: true },
+      });
+
+      const userName = user?.profile
+        ? `${user.profile.firstName} ${user.profile.lastName}`
+        : user?.email || 'Unknown User';
+
+      // Admin notification
+      await this.notifyAdmins(
+        `New ${label} Application Submitted`,
+        `User ${userName} (${user?.email}) has submitted a ${label} application for review.`,
+        NotificationType.UPGRADE,
+        { userId, applicationType, applicationId: payload.applicationId, userName, userEmail: user?.email },
+      );
+
+      this.logger.log(`Admin notified of ${applicationType} application submission from ${user?.email}`);
     } catch (error) {
       this.logger.error('Failed to create application_submitted notification:', error);
     }
@@ -214,6 +348,7 @@ export class NotificationListener {
       const outcome = status === 'Accepted' ? 'approved ✅' : 'rejected ❌';
       const notesMsg = notes ? ` Note: ${notes}` : '';
 
+      // User notification
       await this.notificationService.createNotification({
         userId,
         title: `${label} Application ${status}`,
@@ -221,6 +356,26 @@ export class NotificationListener {
         type: NotificationType.UPGRADE,
         metadata: payload,
       });
+
+      // Get user details for audit log
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, profile: true },
+      });
+
+      const userName = user?.profile
+        ? `${user.profile.firstName} ${user.profile.lastName}`
+        : user?.email || 'Unknown User';
+
+      // Create broadcast notification for admins (audit trail)
+      await this.notifyAdmins(
+        `${label} Application ${status}`,
+        `Application review completed: ${userName} (${user?.email}) application has been ${outcome}.${notesMsg}`,
+        NotificationType.SYSTEM,
+        { userId, applicationType, status, userName, userEmail: user?.email },
+      );
+
+      this.logger.log(`Admin notified of ${applicationType} application review for ${user?.email}`);
     } catch (error) {
       this.logger.error('Failed to create application_reviewed notification:', error);
     }

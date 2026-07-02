@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
 import { CreatePaymentDto } from './dtos/create-payment.dto';
 import { GenerateCorporateInvoiceDto } from './dtos/generate-corporate-invoice.dto';
@@ -17,7 +17,11 @@ export class InvoiceController {
   constructor(private readonly invoiceService: InvoiceService) {}
 
   @Get('my')
-  @ApiOperation({ summary: 'Get invoices of the logged-in user (paginated, supports ?page=1&limit=10)' })
+  @ApiOperation({ summary: 'Get invoices of the logged-in user (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by invoice number' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by invoice status' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getMyInvoices(@Request() req: any, @Query() query: PaginationQueryDto) {
     const userId = req.payload.userId;
     return this.invoiceService.getInvoicesByUserId(userId, query);

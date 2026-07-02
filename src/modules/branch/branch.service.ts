@@ -17,17 +17,24 @@ export class BranchService {
   }
 
   async getAllBranches(query: PaginationQueryDto) {
-    const { page, limit, search } = query;
+    const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
-    const where: any = search
-      ? {
+    const where: any = {
+      ...(search ? {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { city: { contains: search, mode: 'insensitive' } },
         ],
-      }
-      : {};
+      } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
 
     const [data, totalItems] = await Promise.all([
       this.prisma.branch.findMany({
@@ -90,17 +97,24 @@ export class BranchService {
   }
 
   async getAllHubs(query: PaginationQueryDto) {
-    const { page, limit, search } = query;
+    const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
-    const where: any = search
-      ? {
+    const where: any = {
+      ...(search ? {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { address: { contains: search, mode: 'insensitive' } },
         ],
-      }
-      : {};
+      } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
 
     const [data, totalItems] = await Promise.all([
       this.prisma.hub.findMany({
@@ -163,12 +177,23 @@ export class BranchService {
       throw new NotFoundException(`Hub with ID ${hubId} not found`);
     }
 
-    const { page, limit } = query;
+    const { page, limit, status, startDate, endDate } = query;
     const skip = query.getSkip();
+
+    const where: any = {
+      hubId,
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
 
     const [data, totalItems] = await Promise.all([
       this.prisma.hubCommission.findMany({
-        where: { hubId },
+        where,
         skip,
         take: limit,
         include: {
@@ -178,7 +203,7 @@ export class BranchService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.hubCommission.count({ where: { hubId } }),
+      this.prisma.hubCommission.count({ where }),
     ]);
 
     return PaginatedResponseDto.create(data, totalItems, page, limit);

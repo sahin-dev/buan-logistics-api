@@ -12,6 +12,9 @@ model Invoice {
     userId           String
     user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
     payments         Payment[]
+    rewards          Reward[]
+    discountAmount   Float         @default(0.0)
+    rewardNote       String?
     
     // New relation for corporate bulk shipments
     shipments        Shipment[]    @relation("CorporateInvoiceShipments")

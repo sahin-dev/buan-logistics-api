@@ -14,7 +14,7 @@ import {
     Request,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBearerAuth, ApiBody, ApiQuery } from "@nestjs/swagger";
 import { UserService } from "./user.service";
 import { CreateUserDto } from "./dtos/create-user.dto";
 import { UpdateUserDto } from "./dtos/update-user.dto";
@@ -48,7 +48,12 @@ export class UserController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
-    @ApiOperation({ summary: "Get all users (paginated, supports ?page=1&limit=10&search=keyword)" })
+    @ApiOperation({ summary: "Get all users (paginated, supports search, role, status, and date filters)" })
+    @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by email or user name' })
+    @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
+    @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by user tier/status' })
+    @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+    @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
     @ApiResponse({
         status: 200,
         description: "Paginated list of users retrieved successfully",
@@ -79,6 +84,7 @@ export class UserController {
         @Body() dto: UpdateProfileDto,
         @UploadedFile() file?: any,
     ) {
+        console.log("updateMyProfile dto", dto)
         const userId = req.payload.userId;
         const result = await this.userService.updateMyProfile(userId, dto, file);
         return mapUserResponse(result);
@@ -449,6 +455,8 @@ export class UserController {
     @ApiResponse({ status: 404, description: "User not found" })
     @ApiResponse({ status: 400, description: "Bad request" })
     async updateUser(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
+
+        console.log("updateUserDto", updateUserDto)
         const result = await this.userService.updateUser(id, updateUserDto);
         return mapUserResponse(result);
     }

@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Put, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { BranchService } from './branch.service';
 import { CreateBranchDto } from './dtos/create-branch.dto';
 import { CreateHubDto } from './dtos/create-hub.dto';
@@ -25,7 +25,11 @@ export class BranchController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all branches (paginated, supports ?page=1&limit=10&search=keyword)' })
+  @ApiOperation({ summary: 'Get all branches (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by branch name or city' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by branch status where supported' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getAllBranches(@Query() query: PaginationQueryDto) {
     return this.branchService.getAllBranches(query);
   }
@@ -46,7 +50,11 @@ export class BranchController {
   }
 
   @Get('hubs/all')
-  @ApiOperation({ summary: 'Get all hubs (paginated, supports ?page=1&limit=10&search=keyword)' })
+  @ApiOperation({ summary: 'Get all hubs (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by hub name or address' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by hub status where supported' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getAllHubs(@Query() query: PaginationQueryDto) {
 
     return this.branchService.getAllHubs(query);

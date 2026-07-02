@@ -7,14 +7,14 @@ export class SignInUserDto {
     @IsEmail()
     @IsNotEmpty()
     @ApiProperty({
-        example: "johndoe@yopmail.com"
+        example: "customer@angel1951.test"
     })
     email: string
 
     @IsString()
     @IsNotEmpty()
     @ApiProperty({
-        example: "password1234"
+        example: "Password123!"
     })
     password: string
 

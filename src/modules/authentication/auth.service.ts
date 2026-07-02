@@ -107,6 +107,14 @@ export class AuthService {
                 throw new UnauthorizedException("Invalid email or password");
             }
 
+            // Prevent blocked or deleted users from signing in
+            if ((user as any).blocked) {
+                throw new UnauthorizedException('Your account has been blocked. Please contact support.');
+            }
+            if ((user as any).deletedAt) {
+                throw new UnauthorizedException('This account has been deleted.');
+            }
+
             // Verify password
             const isPasswordValid = await this.passwordHasher.comparePassword(
                 password,

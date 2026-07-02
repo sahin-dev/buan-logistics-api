@@ -21,6 +21,22 @@ export class ShipmentService {
     private readonly smtpProvider: SmtpProvider,
   ) {}
 
+  private async generateUniqueShipmentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+
+    while (true) {
+      const suffix = Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
+      const shipmentNumber = `BN-${year}-${suffix}`;
+      const existing = await this.prisma.shipment.findUnique({
+        where: { shipment_number: shipmentNumber },
+      });
+
+      if (!existing) {
+        return shipmentNumber;
+      }
+    }
+  }
+
   async createT1Shipment(dto: CreateT1ShipmentDto) {
     // 1. Search sender by email
     const existingUser = await this.prisma.user.findUnique({
@@ -68,9 +84,12 @@ export class ShipmentService {
       userId = newUser.id;
     }
 
+    const shipmentNumber = await this.generateUniqueShipmentNumber();
+
     // 3. Create shipment
     const shipment = await this.prisma.shipment.create({
       data: {
+        shipment_number: shipmentNumber,
         senderId: userId,
         receiverName: dto.receiverName,
         receiverPhone: dto.receiverPhone,
@@ -140,8 +159,8 @@ export class ShipmentService {
               <h3 style="color: #1a73e8; margin-top: 20px;">Shipment Information</h3>
               <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <tr>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment ID:</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipment.id}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment Number:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipmentNumber}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Name:</td>
@@ -174,8 +193,8 @@ export class ShipmentService {
               <h3 style="color: #1a73e8; margin-top: 20px;">Shipment Information</h3>
               <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                 <tr>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment ID:</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipment.id}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Shipment Number:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${shipmentNumber}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Name:</td>
@@ -206,6 +225,8 @@ export class ShipmentService {
       shipmentId: shipment.id,
       senderId: shipment.senderId,
       trackingNumber: shipment.tracking_number,
+      shipment_number: shipment.shipment_number,
+      receiverName: shipment.receiverName,
     });
 
     return shipment;
@@ -228,8 +249,11 @@ export class ShipmentService {
       throw new BadRequestException('T3 Premium customers must provide full container details.');
     }
 
+    const shipmentNumber = await this.generateUniqueShipmentNumber();
+
     const shipment = await this.prisma.shipment.create({
       data: {
+        shipment_number: shipmentNumber,
         senderId: dto.senderId,
         receiverName: dto.receiverName,
         receiverPhone: dto.receiverPhone,
@@ -265,6 +289,9 @@ export class ShipmentService {
     this.eventEmitter.emit('shipment.created', {
       shipmentId: shipment.id,
       senderId: sender.id,
+      trackingNumber: shipment.tracking_number,
+      shipment_number: shipment.shipment_number,
+      receiverName: shipment.receiverName,
       cost: dto.cost,
       paymentType,
       autoInvoice: true,
@@ -295,9 +322,11 @@ export class ShipmentService {
     }
 
     const trackingNumber = `TRK-${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const shipmentNumber = await this.generateUniqueShipmentNumber();
 
     const shipment = await this.prisma.shipment.create({
       data: {
+        shipment_number: shipmentNumber,
         senderId: dto.senderId,
         receiverName: dto.receiverName,
         receiverPhone: dto.receiverPhone,
@@ -327,6 +356,8 @@ export class ShipmentService {
       shipmentId: shipment.id,
       senderId: shipment.senderId,
       trackingNumber: shipment.tracking_number,
+      shipment_number: shipment.shipment_number,
+      receiverName: shipment.receiverName,
     });
 
     return shipment;
@@ -475,8 +506,13 @@ export class ShipmentService {
   }
 
   async trackShipment(trackingNumber: string) {
-    const shipment = await this.prisma.shipment.findUnique({
-      where: { tracking_number: trackingNumber },
+    const shipment = await this.prisma.shipment.findFirst({
+      where: {
+        OR: [
+          { tracking_number: trackingNumber },
+          { shipment_number: trackingNumber },
+        ],
+      },
       include: {
         timeline: {
           orderBy: { timestamp: 'asc' },
@@ -492,16 +528,87 @@ export class ShipmentService {
   }
 
   async getMyShipments(userId: string, query: PaginationQueryDto) {
-    const { page, limit } = query;
+    const { page, limit, search, status, shipmentType, startDate, endDate } = query;
     const skip = query.getSkip();
 
-    const where = { senderId: userId };
+    const where: any = {
+      senderId: userId,
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { tracking_number: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+      ...(status ? { current_status: status } : {}),
+      ...(shipmentType ? { shipmentType } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
     const [data, totalItems] = await Promise.all([
       this.prisma.shipment.findMany({
         where,
         skip,
         take: limit,
-        include: { timeline: true, invoices: true },
+        include: {
+          timeline: { orderBy: { timestamp: 'asc' } },
+          invoices: true,
+          rewards: true,
+          branch: true,
+          hub: true,
+          sender: { include: { profile: true } },
+          container: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.shipment.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  async getAllShipmentsForAdmin(query: PaginationQueryDto) {
+    const { page, limit, search, status, shipmentType, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { shipment_number: { contains: search, mode: 'insensitive' } },
+          { tracking_number: { contains: search, mode: 'insensitive' } },
+          { sender: { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      } : {}),
+      ...(status ? { current_status: status } : {}),
+      ...(shipmentType ? { shipmentType } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          timeline: { orderBy: { timestamp: 'asc' } },
+          invoices: true,
+          rewards: true,
+          branch: true,
+          hub: true,
+          sender: { include: { profile: true } },
+          container: true,
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.shipment.count({ where }),
@@ -600,6 +707,35 @@ export class ShipmentService {
     }
 
     return updatedContainer;
+  }
+
+  async getShipmentById(shipmentId: string) {
+    try {
+      const shipment = await this.prisma.shipment.findUnique({
+        where: { id: shipmentId },
+        include: {
+          timeline: { orderBy: { timestamp: 'asc' } },
+          invoices: true,
+          rewards: true,
+          branch: true,
+          hub: true,
+          sender: { include: { profile: true } },
+          container: true,
+        },
+      });
+
+      if (!shipment) {
+        throw new NotFoundException(`Shipment with ID ${shipmentId} not found`);
+      }
+
+      return shipment;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error fetching shipment ${shipmentId}:`, error);
+      throw error;
+    }
   }
 
   async getContainerById(id: string) {

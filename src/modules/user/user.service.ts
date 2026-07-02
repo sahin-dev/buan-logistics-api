@@ -203,17 +203,17 @@ export class UserService {
             // Verify user exists
             await this.getUserById(userId);
 
-            // Delete user profile first
-            await this.prismaService.userProfile.deleteMany({
-                where: { userId },
-            });
-
-            // Delete user
-            const deletedUser = await this.prismaService.user.delete({
+            // Soft-delete: set deletedAt and block the user to avoid foreign key conflicts
+            const softDeletedUser = await this.prismaService.user.update({
                 where: { id: userId },
+                data: {
+                    deletedAt: new Date(),
+                    blocked: true,
+                },
+                include: { profile: true },
             });
 
-            return deletedUser;
+            return softDeletedUser as unknown as User;
         } catch (error) {
             if (error instanceof NotFoundException) {
                 throw error;
@@ -231,21 +231,19 @@ export class UserService {
     async blockUser(userId: string): Promise<User> {
         try {
             // Verify user exists
-            await this.getUserById(userId);
+            const user = await this.getUserById(userId);
 
-            // Note: You may need to add an 'isBlocked' field to the User model
-            // For now, this is a placeholder implementation
             const blockedUser = await this.prismaService.user.update({
                 where: { id: userId },
                 data: {
-                    // Add isBlocked or status field when added to schema
+                    blocked: !user.blocked,
                 },
                 include: {
                     profile: true,
                 },
             });
 
-            return blockedUser;
+            return blockedUser as unknown as User;
         } catch (error) {
             if (error instanceof NotFoundException) {
                 throw error;
@@ -331,18 +329,26 @@ export class UserService {
      */
     async getAllUsers(query: PaginationQueryDto): Promise<PaginatedResponseDto<User>> {
         try {
-            const { page, limit, search } = query;
+            const { page, limit, search, role, status, startDate, endDate } = query;
             const skip = query.getSkip();
 
-            const where: any = search
-                ? {
+            const where: any = {
+                ...(search ? {
                     OR: [
                         { email: { contains: search, mode: 'insensitive' } },
                         { profile: { firstName: { contains: search, mode: 'insensitive' } } },
                         { profile: { lastName: { contains: search, mode: 'insensitive' } } },
                     ],
-                }
-                : {};
+                } : {}),
+                ...(role ? { role } : {}),
+                ...(status ? { tier: status } : {}),
+                ...(startDate || endDate ? {
+                    createdAt: {
+                        ...(startDate ? { gte: new Date(startDate) } : {}),
+                        ...(endDate ? { lte: new Date(endDate) } : {}),
+                    },
+                } : {}),
+            };
 
             const [users, totalItems] = await Promise.all([
                 this.prismaService.user.findMany({
@@ -436,18 +442,47 @@ export class UserService {
             if (data.address !== undefined) profileUpdateData.address = data.address;
             if (avatarUrl !== undefined) profileUpdateData.avatar = avatarUrl;
 
-            // Update user profile
-            const updatedUser = await this.prismaService.user.update({
-                where: { id: userId },
-                data: {
-                    profile: {
-                        update: profileUpdateData,
+            // Update or create user profile depending on existence
+            const existingProfile = await this.prismaService.userProfile.findUnique({ where: { userId } });
+
+            let updatedUser: any;
+            if (existingProfile) {
+                updatedUser = await this.prismaService.user.update({
+                    where: { id: userId },
+                    data: {
+                        profile: {
+                            update: profileUpdateData,
+                        },
                     },
-                },
-                include: {
-                    profile: true,
-                },
-            });
+                    include: {
+                        profile: true,
+                    },
+                });
+            } else {
+                if (!profileUpdateData.firstName || !profileUpdateData.lastName) {
+                    throw new BadRequestException(
+                        'Cannot create user profile without firstName and lastName',
+                    );
+                }
+
+                updatedUser = await this.prismaService.user.update({
+                    where: { id: userId },
+                    data: {
+                        profile: {
+                            create: {
+                                firstName: profileUpdateData.firstName,
+                                lastName: profileUpdateData.lastName,
+                                phone: profileUpdateData.phone,
+                                address: profileUpdateData.address,
+                                avatar: profileUpdateData.avatar,
+                            },
+                        },
+                    },
+                    include: {
+                        profile: true,
+                    },
+                });
+            }
 
             return updatedUser;
         } catch (error) {
@@ -570,35 +605,69 @@ export class UserService {
     }
 
     async getUpgradeApplications(query: PaginationQueryDto) {
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
 
-        console.log("asdfghgfghfd")
+        const where: any = {
+            ...(search ? {
+                OR: [
+                    { companyName: { contains: search, mode: 'insensitive' } },
+                    { email: { contains: search, mode: 'insensitive' } },
+                    { notes: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.upgradeApplication.findMany({
+                where,
                 skip,
                 take: limit,
                 include: { user: { include: { profile: true } } },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.upgradeApplication.count(),
+            this.prismaService.upgradeApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);
     }
 
     async getHubProviderApplications(query: PaginationQueryDto) {
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
+
+        const where: any = {
+            ...(search ? {
+                OR: [
+                    { email: { contains: search, mode: 'insensitive' } },
+                    { ownerEmail: { contains: search, mode: 'insensitive' } },
+                    { rejection_notes: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.hubProviderApplication.findMany({
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.hubProviderApplication.count(),
+            this.prismaService.hubProviderApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);
@@ -812,17 +881,35 @@ export class UserService {
     }
 
     async getCorporatePartnerApplications(query: PaginationQueryDto) {
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
+
+        const where: any = {
+            ...(search ? {
+                OR: [
+                    { companyName: { contains: search, mode: 'insensitive' } },
+                    { contactName: { contains: search, mode: 'insensitive' } },
+                    { contactEmail: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.corporatePartnerApplication.findMany({
+                where,
                 skip,
                 take: limit,
                 include: { user: { include: { profile: true } } },
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.corporatePartnerApplication.count(),
+            this.prismaService.corporatePartnerApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);
@@ -908,19 +995,35 @@ export class UserService {
     }
 
     async getMyUpgradeApplications(userId: string, query: PaginationQueryDto) {
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
+
+        const where: any = {
+            userId,
+            ...(search ? {
+                OR: [
+                    { companyName: { contains: search, mode: 'insensitive' } },
+                    { email: { contains: search, mode: 'insensitive' } },
+                    { notes: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.upgradeApplication.findMany({
-                where: { userId },
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.upgradeApplication.count({
-                where: { userId },
-            }),
+            this.prismaService.upgradeApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);
@@ -936,38 +1039,70 @@ export class UserService {
             throw new NotFoundException(`User with ID ${userId} not found`);
         }
 
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
+
+        const where: any = {
+            ownerEmail: user.email,
+            ...(search ? {
+                OR: [
+                    { email: { contains: search, mode: 'insensitive' } },
+                    { ownerEmail: { contains: search, mode: 'insensitive' } },
+                    { rejection_notes: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.hubProviderApplication.findMany({
-                where: { ownerEmail: user.email },
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.hubProviderApplication.count({
-                where: { ownerEmail: user.email },
-            }),
+            this.prismaService.hubProviderApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);
     }
 
     async getMyCorporateApplications(userId: string, query: PaginationQueryDto) {
-        const { page, limit } = query;
+        const { page, limit, search, applicationStatus, startDate, endDate } = query;
         const skip = query.getSkip();
+
+        const where: any = {
+            userId,
+            ...(search ? {
+                OR: [
+                    { companyName: { contains: search, mode: 'insensitive' } },
+                    { contactName: { contains: search, mode: 'insensitive' } },
+                    { contactEmail: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+            ...(applicationStatus ? { status: applicationStatus } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [data, totalItems] = await Promise.all([
             this.prismaService.corporatePartnerApplication.findMany({
-                where: { userId },
+                where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-            this.prismaService.corporatePartnerApplication.count({
-                where: { userId },
-            }),
+            this.prismaService.corporatePartnerApplication.count({ where }),
         ]);
 
         return PaginatedResponseDto.create(data, totalItems, page, limit);

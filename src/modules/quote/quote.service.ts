@@ -55,19 +55,26 @@ export class QuoteService {
      * Get paginated quotes for admin
      */
     async getQuotes(query: PaginationQueryDto) {
-        const { page, limit, search } = query;
+        const { page, limit, search, status, startDate, endDate } = query;
         const skip = query.getSkip();
 
-        const where: any = search
-            ? {
-                  OR: [
-                      { fullName: { contains: search, mode: "insensitive" } },
-                      { email: { contains: search, mode: "insensitive" } },
-                      { phone: { contains: search, mode: "insensitive" } },
-                      { whatWeArePickingUp: { contains: search, mode: "insensitive" } },
-                  ],
-              }
-            : {};
+        const where: any = {
+            ...(search ? {
+                OR: [
+                    { fullName: { contains: search, mode: "insensitive" } },
+                    { email: { contains: search, mode: "insensitive" } },
+                    { phone: { contains: search, mode: "insensitive" } },
+                    { whatWeArePickingUp: { contains: search, mode: "insensitive" } },
+                ],
+            } : {}),
+            ...(status ? { status } : {}),
+            ...(startDate || endDate ? {
+                createdAt: {
+                    ...(startDate ? { gte: new Date(startDate) } : {}),
+                    ...(endDate ? { lte: new Date(endDate) } : {}),
+                },
+            } : {}),
+        };
 
         const [quotes, totalItems] = await Promise.all([
             this.prisma.quote.findMany({

@@ -1,15 +1,60 @@
+model RewardRule {
+    id               String      @id @default(uuid())
+    rewardType       RewardType  @unique
+    name             String
+    description      String?
+    thresholdCount   Int         @default(0)
+    thresholdWeight  Float       @default(0.0)
+    discountPercent  Float       @default(0.0)
+    freeShipment     Boolean     @default(false)
+    freeKgLimit      Float       @default(0.0)
+    isActive         Boolean     @default(true)
+    createdAt        DateTime    @default(now())
+    updatedAt        DateTime    @updatedAt
+
+    @@map("reward_rules")
+}
+
+model UserRewardProgress {
+    id                String      @id @default(uuid())
+    userId            String
+    rewardType        RewardType
+    completedCount    Int         @default(0)
+    completedWeight   Float       @default(0.0)
+    available         Boolean     @default(false)
+    lastCompletedAt   DateTime?
+    createdAt         DateTime    @default(now())
+    updatedAt         DateTime    @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, rewardType])
+    @@map("user_reward_progress")
+}
+
 model Reward {
     id         String   @id @default(uuid())
     userId     String
     user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     shipmentId String?  @unique
     shipment   Shipment? @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    invoiceId  String?
+    invoice    Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
     source     RewardSource @default(SHIPMENT)
+    rewardType RewardType?
     description String?
     points     Float    @default(10.0) // configurable default points
+    claimed    Boolean  @default(false)
+    claimedAt  DateTime?
     createdAt  DateTime @default(now())
 
     @@map("rewards")
+}
+
+enum RewardType {
+    AIR_CARGO
+    SEA_CARGO
+    KG_SHIPMENT
 }
 
 enum RewardSource {

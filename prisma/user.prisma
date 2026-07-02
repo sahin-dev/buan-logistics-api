@@ -3,6 +3,8 @@ model User {
     email String @unique
     password String?
     provider String @default("local")
+    blocked Boolean @default(false)
+    deletedAt DateTime?
     profile UserProfile? 
     businessProfile BusinessProfile?
     coporatePartnerProfile  CorporatePartnerProfile?
@@ -15,6 +17,7 @@ model User {
     sentShipments      Shipment[]           @relation("SentShipments")
     invoices           Invoice[]
     rewards            Reward[]
+    rewardProgresses   UserRewardProgress[]
     hub                Hub?
     passwordResetTokens PasswordResetToken[]
     notifications       Notification[]
@@ -249,4 +252,4 @@ model UserAddress {
     user User @relation("UserAddresses", fields: [userId], references: [id], onDelete: Cascade)
 
     @@map("user_addresses")
-}
+}
