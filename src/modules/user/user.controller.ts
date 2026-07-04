@@ -48,12 +48,16 @@ export class UserController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)
     @ApiBearerAuth()
+<<<<<<< HEAD
     @ApiOperation({ summary: "Get all users (paginated, supports search, role, status, and date filters)" })
     @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by email or user name' })
     @ApiQuery({ name: 'role', required: false, type: String, description: 'Filter by user role' })
     @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by user tier/status' })
     @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
     @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
+=======
+    @ApiOperation({ summary: "Get all users (paginated, supports ?page=1&limit=10&search=keyword)" })
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
     @ApiResponse({
         status: 200,
         description: "Paginated list of users retrieved successfully",
@@ -455,8 +459,11 @@ export class UserController {
     @ApiResponse({ status: 404, description: "User not found" })
     @ApiResponse({ status: 400, description: "Bad request" })
     async updateUser(@Param("id") id: string, @Body() updateUserDto: UpdateUserDto) {
+<<<<<<< HEAD
 
         console.log("updateUserDto", updateUserDto)
+=======
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
         const result = await this.userService.updateUser(id, updateUserDto);
         return mapUserResponse(result);
     }

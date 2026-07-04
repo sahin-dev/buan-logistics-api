@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 model User {
     id  String @id @default(uuid())
     email String @unique
@@ -253,3 +254,257 @@ model UserAddress {
 
     @@map("user_addresses")
 }
+=======
+model User {
+    id  String @id @default(uuid())
+    email String @unique
+    password String?
+    provider String @default("local")
+    profile UserProfile? 
+    businessProfile BusinessProfile?
+    coporatePartnerProfile  CorporatePartnerProfile?
+    coporatePartnerApplication CorporatePartnerApplication?
+    hubProviderProfile  HubProviderProfile?
+    tier Tier @default(T1)
+    role Role @default(USER)
+
+    upgradeApplication UpgradeApplication[]
+    sentShipments      Shipment[]           @relation("SentShipments")
+    invoices           Invoice[]
+    rewards            Reward[]
+    hub                Hub?
+    passwordResetTokens PasswordResetToken[]
+    notifications       Notification[]
+    referrals           Referral[]           @relation("Referrals")
+    referredBy          Referral?            @relation("ReferredBy")
+    addresses           UserAddress[]        @relation("UserAddresses")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("users")
+}
+
+
+model UserProfile {
+    id String @id @default(uuid())
+    avatar String?
+    userId String @unique 
+    firstName String
+    lastName String
+    location String?
+    phone String?
+    address String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BusinessProfile {
+    id  String @id @default(uuid())
+    userId      String @unique
+    autorizedPersonFullName  String
+    authorizedPersonTitle  String
+    companyName  String
+    tradingName  String
+    Reg_no       String
+    country      String
+    address      String
+    email        String
+    phone        String
+    website      String
+    type         String
+
+    status    ApplicationStatus
+
+    user  User @relation(references: [id], fields: [userId], onDelete: Cascade)
+    operation_mode  OperationMode
+    createdAt  DateTime
+    updatedAt  DateTime
+
+    @@map("business_profiles")
+
+}
+
+model CorporatePartnerProfile {
+    id                      String            @id @default(uuid())
+    userId                  String            @unique
+    companyName             String
+    tradingName             String?
+    regNo                   String
+    country                 String
+    address                 String
+    yearsInOperation        String
+    contactName             String
+    contactPosition         String
+    contactPhone            String
+    contactEmail            String
+    website                 String?
+    businessNature          String[]
+    countriesOperateFrom    String
+    countriesShipTo         String
+    cargoTypes              String[]
+    estimatedMonthlyVolume  String
+    servicesRequired        String
+    rateCardUrl             String?
+    billingCycle            BillingCycle      @default(MONTHLY)
+
+    user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    @@map("corporate_partner_profiles")
+}
+
+model CorporatePartnerApplication {
+    id                      String            @id @default(uuid())
+    userId                  String            @unique
+    companyName             String
+    tradingName             String?
+    regNo                   String
+    country                 String
+    address                 String
+    yearsInOperation        String
+    contactName             String
+    contactPosition         String
+    contactPhone            String
+    contactEmail            String
+    website                 String?
+    businessNature          String[]
+    countriesOperateFrom    String
+    countriesShipTo         String
+    cargoTypes              String[]
+    estimatedMonthlyVolume  String
+    servicesRequired        String
+    status                  ApplicationStatus @default(Pending)
+    rejectionNotes          String?
+    createdAt               DateTime          @default(now())
+    updatedAt               DateTime          @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("corporate_partner_applications")
+}
+
+model HubProviderProfile {
+    id String @id @default(uuid())
+    userId  String @unique
+
+    user User @relation(fields: [userId], references: [id])
+}
+
+model UpgradeApplication {
+    id         String            @id @default(uuid())
+    userId     String
+    targetTier Tier
+    status     ApplicationStatus @default(Pending)
+    notes      String?
+    createdAt  DateTime          @default(now())
+    updatedAt  DateTime          @updatedAt
+
+    // Business Customer (Tier 2) Fields
+    autorizedPersonFullName  String?
+    authorizedPersonTitle    String?
+    companyName              String?
+    tradingName              String?
+    Reg_no                   String?
+    country                  String?
+    address                  String?
+    email                    String?
+    phone                    String?
+    website                  String?
+    type                     String?
+    operation_mode           OperationMode?
+
+    // Business Partner (Tier 3) Fields
+    yearsInOperation         String?
+    contactName              String?
+    contactPosition          String?
+    contactPhone             String?
+    contactEmail             String?
+    businessNature           String[]
+    countriesOperateFrom     String?
+    countriesShipTo          String?
+    cargoTypes               String[]
+    estimatedMonthlyVolume   String?
+    servicesRequired         String?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Referral {
+    id              String         @id @default(uuid())
+    referrerUserId  String
+    referredEmail   String
+    referredUserId  String?        @unique
+    referralCode    String         @unique
+    status          ReferralStatus @default(PENDING)
+    rewardPoints    Float          @default(0.0)
+    createdAt       DateTime       @default(now())
+    updatedAt       DateTime       @updatedAt
+
+    referrer     User  @relation("Referrals", fields: [referrerUserId], references: [id], onDelete: Cascade)
+    referredUser User? @relation("ReferredBy", fields: [referredUserId], references: [id], onDelete: Cascade)
+    @@map("referrals")
+}
+
+enum ReferralStatus {
+    PENDING
+    COMPLETED
+    EXPIRED
+}
+
+enum BillingCycle {
+    WEEKLY
+    BIWEEKLY
+    MONTHLY
+}
+
+enum Tier {
+    T1
+    T2
+    T3
+}
+
+enum Role {
+    USER
+    ADMIN
+    CORPORATE_PARTNER
+    HUB_PROIVDER
+    BRANCH
+}
+
+enum ApplicationStatus {
+    Pending
+    Accepted
+    Rejected
+}
+
+enum OperationMode {
+    Offline
+    Online
+    Both
+}
+
+model PasswordResetToken {
+    id        String   @id @default(uuid())
+    userId    String
+    token     String   @unique
+    expiresAt DateTime
+    used      Boolean  @default(false)
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    @@map("password_reset_tokens")
+}
+
+model UserAddress {
+    id        String   @id @default(uuid())
+    userId    String
+    title     String   // e.g. "Home", "Office"
+    address   String
+    isDefault Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation("UserAddresses", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("user_addresses")
+}
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48

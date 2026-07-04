@@ -20,12 +20,18 @@ export class BranchService {
     const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
+<<<<<<< HEAD
     const where: any = {
       ...(search ? {
+=======
+    const where: any = search
+      ? {
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { city: { contains: search, mode: 'insensitive' } },
         ],
+<<<<<<< HEAD
       } : {}),
       ...(status ? { status } : {}),
       ...(startDate || endDate ? {
@@ -35,6 +41,10 @@ export class BranchService {
         },
       } : {}),
     };
+=======
+      }
+      : {};
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
 
     const [data, totalItems] = await Promise.all([
       this.prisma.branch.findMany({
@@ -100,12 +110,18 @@ export class BranchService {
     const { page, limit, search, status, startDate, endDate } = query;
     const skip = query.getSkip();
 
+<<<<<<< HEAD
     const where: any = {
       ...(search ? {
+=======
+    const where: any = search
+      ? {
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { address: { contains: search, mode: 'insensitive' } },
         ],
+<<<<<<< HEAD
       } : {}),
       ...(status ? { status } : {}),
       ...(startDate || endDate ? {
@@ -115,6 +131,10 @@ export class BranchService {
         },
       } : {}),
     };
+=======
+      }
+      : {};
+>>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
 
     const [data, totalItems] = await Promise.all([
       this.prisma.hub.findMany({
