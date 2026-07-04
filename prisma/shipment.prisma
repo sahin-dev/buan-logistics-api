@@ -1,14 +1,9 @@
 model Shipment {
-<<<<<<< HEAD
     id               String  @id @default(uuid())
     shipment_number  String? @unique // Human-friendly shipping reference
     tracking_number  String? @unique // Generated after payment
     senderId         String
-=======
-    id              String  @id @default(uuid())
-    tracking_number String? @unique // Generated after payment
-    senderId        String
->>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
+
     sender          User    @relation("SentShipments", fields: [senderId], references: [id])
 
     // Receiver Info
@@ -38,10 +33,7 @@ model Shipment {
     timeline       ShipmentTimeline[]
     current_status ShipmentStatus     @default(PENDING)
     type           ShipmentType       @default(STANDARD)
-<<<<<<< HEAD
-    shipmentType   ShipmentMode?
-=======
->>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
+
     invoices       Invoice[]          @relation("SingleShipmentInvoice")
     rewards        Reward[]
 
@@ -132,11 +124,8 @@ enum ShipmentType {
     CONSOLIDATED
     FULL_CONTAINER
 }
-<<<<<<< HEAD
 
 enum ShipmentMode {
     AIR_CARGO
     SEA_CARGO
 }
-=======
->>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48

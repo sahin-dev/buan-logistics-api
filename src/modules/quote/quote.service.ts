@@ -55,7 +55,6 @@ export class QuoteService {
      * Get paginated quotes for admin
      */
     async getQuotes(query: PaginationQueryDto) {
-<<<<<<< HEAD
         const { page, limit, search, status, startDate, endDate } = query;
         const skip = query.getSkip();
 
@@ -76,21 +75,6 @@ export class QuoteService {
                 },
             } : {}),
         };
-=======
-        const { page, limit, search } = query;
-        const skip = query.getSkip();
-
-        const where: any = search
-            ? {
-                  OR: [
-                      { fullName: { contains: search, mode: "insensitive" } },
-                      { email: { contains: search, mode: "insensitive" } },
-                      { phone: { contains: search, mode: "insensitive" } },
-                      { whatWeArePickingUp: { contains: search, mode: "insensitive" } },
-                  ],
-              }
-            : {};
->>>>>>> 23297c505d429a4cfd9792716a8f892f69caea48
 
         const [quotes, totalItems] = await Promise.all([
             this.prisma.quote.findMany({

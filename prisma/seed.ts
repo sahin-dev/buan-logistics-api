@@ -108,6 +108,16 @@ async function main() {
       },
     });
 
+    await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "branch_manager@buanenterprise.com",
+        password: hubProviderHashedPassword,
+        provider: "local",
+        role: Role.BRANCH,
+      },
+    });
+
     await tx.userProfile.create({
       data: {
         userId: customerUser.id,
@@ -330,7 +340,6 @@ async function main() {
         delivered_at: now,
         current_status: ShipmentStatus.DELIVERED,
         type: ShipmentType.EXPRESS,
-        shipmentType: ShipmentMode.AIR_CARGO,
         pickupContactName: "Ada Lovelace",
         pickupContactPhone: "+2348000000000",
         pickupAddress: "12 Sample Drive",
