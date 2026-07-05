@@ -12,6 +12,9 @@ model User {
     hubProviderProfile  HubProviderProfile?
     tier Tier @default(T1)
     role Role @default(USER)
+    branchId String?
+    branch Branch? @relation("BranchUsers", fields: [branchId], references: [id], onDelete: SetNull)
+    referralCode String? @unique
 
     upgradeApplication UpgradeApplication[]
     sentShipments      Shipment[]           @relation("SentShipments")
@@ -27,6 +30,7 @@ model User {
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+    @@index([branchId])
     @@map("users")
 }
 
@@ -179,7 +183,7 @@ model Referral {
     referrerUserId  String
     referredEmail   String
     referredUserId  String?        @unique
-    referralCode    String         @unique
+    referralCode    String
     status          ReferralStatus @default(PENDING)
     rewardPoints    Float          @default(0.0)
     createdAt       DateTime       @default(now())
@@ -187,6 +191,7 @@ model Referral {
 
     referrer     User  @relation("Referrals", fields: [referrerUserId], references: [id], onDelete: Cascade)
     referredUser User? @relation("ReferredBy", fields: [referredUserId], references: [id], onDelete: Cascade)
+    @@index([referralCode])
     @@map("referrals")
 }
 

@@ -18,6 +18,28 @@ export class ReferralController {
     return this.referralService.createReferralInvite(userId, email);
   }
 
+  @Get('my/code')
+  @ApiOperation({ summary: 'Get the logged-in user unique referral code' })
+  async getMyReferralCode(@Request() req: any) {
+    return this.referralService.getMyReferralCode(req.payload.userId);
+  }
+
+  @Post('apply')
+  @ApiOperation({ summary: 'Apply a referral code to the logged-in user' })
+  async applyReferralCode(@Request() req: any, @Body('referralCode') referralCode: string) {
+    return this.referralService.applyReferralCode(
+      req.payload.userId,
+      req.payload.username || req.payload.email || '',
+      referralCode,
+    );
+  }
+
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Referral dashboard data for the logged-in user' })
+  async getDashboard(@Request() req: any) {
+    return this.referralService.getDashboard(req.payload.userId);
+  }
+
   @Get('my')
   @ApiOperation({ summary: 'Get list of referrals sent by the logged-in user (paginated, supports search and filters)' })
   @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by referred email' })
@@ -27,5 +49,11 @@ export class ReferralController {
   async getMyReferrals(@Request() req: any, @Query() query: PaginationQueryDto) {
     const userId = req.payload.userId;
     return this.referralService.getMyReferrals(userId, query);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Referral history for the logged-in user' })
+  async getReferralHistory(@Request() req: any, @Query() query: PaginationQueryDto) {
+    return this.referralService.getReferralHistory(req.payload.userId, query);
   }
 }

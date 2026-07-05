@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { InvoiceService } from './invoice.service';
 import { CreatePaymentDto } from './dtos/create-payment.dto';
 import { GenerateCorporateInvoiceDto } from './dtos/generate-corporate-invoice.dto';
@@ -8,6 +8,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
+import { GetInvoicesByBranchIdDto } from './dtos/get-invoices-by-branchid';
 
 @ApiTags('Invoices & Payments')
 @Controller('invoices')
@@ -40,6 +41,28 @@ export class InvoiceController {
     );
   }
 
+
+
+  @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get all invoices (Admin only, paginated, supports search and filters)' })
+  async getAllInvoices(@Query() query: PaginationQueryDto) {
+    return this.invoiceService.getAllInvoices(query);
+  }
+
+  @Get("branch")
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.BRANCH)
+  @ApiOperation({ summary: 'Get invoices for the logged-in branch (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by invoice number' })
+  @ApiBody({type: GetInvoicesByBranchIdDto, description: 'Branch ID to filter invoices'})
+  async getBranchInvoices(@Request() req: any, @Query() query: PaginationQueryDto) {
+    const branchId = req.payload.branchId;
+    return this.invoiceService.getBranchInvoices(branchId, query);
+  }
+
+  
   @Get(':id')
   @ApiOperation({ summary: 'Get invoice by ID' })
   async getInvoiceById(@Param('id') id: string) {

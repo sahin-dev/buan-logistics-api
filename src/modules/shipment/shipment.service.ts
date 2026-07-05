@@ -5,8 +5,9 @@ import { CreateT1ShipmentDto } from './dtos/create-t1-shipment.dto';
 import { CreateT2T3ShipmentDto } from './dtos/create-t2t3-shipment.dto';
 import { CreateCorporateShipmentDto } from './dtos/create-corporate-shipment.dto';
 import { CreateContainerDto } from './dtos/create-container.dto';
+import { CreateShipmentFromIntakeDto } from './dtos/create-shipment-from-intake.dto';
 import { PasswordHasher } from '../authentication/utils/PasswordHasher';
-import { ShipmentStatus, ShipmentType, Tier, Role, ContainerType, ContainerStatus } from 'generated/prisma/enums';
+import { ShipmentStatus, ShipmentType, Tier, Role, ContainerType, ContainerStatus, IntakeParcelStatus } from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
 import { SmtpProvider } from 'src/common/providers/smtp.provider';
@@ -37,6 +38,98 @@ export class ShipmentService {
     }
   }
 
+  private async generateUniqueReferralCode(): Promise<string> {
+    while (true) {
+      const suffix = Math.floor(100000 + Math.random() * 900000).toString();
+      const referralCode = `REF${suffix}`;
+      const existing = await this.prisma.user.findUnique({
+        where: { referralCode },
+      });
+
+      if (!existing) {
+        return referralCode;
+      }
+    }
+  }
+
+  private async getBranchIdForUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { branchId: true },
+    });
+
+    if (!user?.branchId) {
+      throw new BadRequestException('No branch is assigned to this branch user.');
+    }
+
+    return user.branchId;
+  }
+
+  private async getOrCreateT1Sender(dto: {
+    senderEmail: string;
+    senderFirstName: string;
+    senderLastName: string;
+    senderPhone: string;
+  }) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.senderEmail },
+      include: { profile: true },
+    });
+
+    if (existingUser) {
+      if (existingUser.tier === Tier.T3 || existingUser.role === Role.CORPORATE_PARTNER) {
+        throw new BadRequestException('Container (T3) and Corporate users cannot use hub intake shipments.');
+      }
+
+      return { userId: existingUser.id, isNewUser: false, generatedPassword: '', existingUser };
+    }
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let generatedPassword = '';
+    for (let i = 0; i < 10; i++) {
+      generatedPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    const hashedPassword = await this.passwordHasher.hashPassword(generatedPassword);
+    const referralCode = await this.generateUniqueReferralCode();
+    const newUser = await this.prisma.user.create({
+      data: {
+        email: dto.senderEmail,
+        password: hashedPassword,
+        provider: 'local',
+        role: Role.USER,
+        tier: Tier.T1,
+        referralCode,
+        profile: {
+          create: {
+            firstName: dto.senderFirstName,
+            lastName: dto.senderLastName,
+            phone: dto.senderPhone,
+          },
+        },
+      },
+      include: { profile: true },
+    });
+
+    return { userId: newUser.id, isNewUser: true, generatedPassword, existingUser: newUser };
+  }
+
+  private async validateDeliveryHub(deliveryHubId: string, branchId: string) {
+    const deliveryHub = await this.prisma.hub.findUnique({
+      where: { id: deliveryHubId },
+    });
+
+    if (!deliveryHub) {
+      throw new NotFoundException(`Delivery hub with ID ${deliveryHubId} not found`);
+    }
+
+    if (deliveryHub.branchId !== branchId) {
+      throw new BadRequestException('Delivery hub must belong to the assigned branch.');
+    }
+
+    return deliveryHub;
+  }
+
   async createT1Shipment(dto: CreateT1ShipmentDto) {
     // 1. Search sender by email
     const existingUser = await this.prisma.user.findUnique({
@@ -64,6 +157,7 @@ export class ShipmentService {
       }
       generatedPassword = randomPass;
       const hashedPassword = await this.passwordHasher.hashPassword(generatedPassword);
+      const referralCode = await this.generateUniqueReferralCode();
 
       const newUser = await this.prisma.user.create({
         data: {
@@ -72,6 +166,7 @@ export class ShipmentService {
           provider: 'local',
           role: Role.USER,
           tier: Tier.T1,
+          referralCode,
           profile: {
             create: {
               firstName: dto.senderFirstName,
@@ -96,6 +191,7 @@ export class ShipmentService {
         receiverAddress: dto.receiverAddress,
         weight: dto.weight,
         hubId: dto.hubId,
+        originHubId: dto.hubId,
         current_status: ShipmentStatus.AT_HUB,
         type: ShipmentType.STANDARD,
         // Pickup scheduling ("send for someone else" feature)
@@ -434,6 +530,138 @@ export class ShipmentService {
     return updated;
   }
 
+  async createFromIntakeParcel(intakeParcelId: string, dto: CreateShipmentFromIntakeDto, branchUserId: string) {
+    const branchId = await this.getBranchIdForUser(branchUserId);
+
+    const intakeParcel = await this.prisma.intakeParcel.findUnique({
+      where: { id: intakeParcelId },
+      include: { hub: true },
+    });
+
+    if (!intakeParcel) {
+      throw new NotFoundException(`Intake parcel with ID ${intakeParcelId} not found`);
+    }
+
+    if (intakeParcel.hub.branchId !== branchId) {
+      throw new BadRequestException('This intake parcel does not belong to your branch.');
+    }
+
+    if (intakeParcel.status !== IntakeParcelStatus.HANDED_OVER) {
+      throw new BadRequestException('Only handed over intake parcels can be converted to shipments.');
+    }
+
+    if (dto.deliveryHubId) {
+      await this.validateDeliveryHub(dto.deliveryHubId, branchId);
+    }
+
+    const sender = await this.getOrCreateT1Sender(dto);
+    const shipmentNumber = await this.generateUniqueShipmentNumber();
+    const cost = dto.cost ?? 0.0;
+
+    const shipment = await this.prisma.$transaction(async (tx) => {
+      await tx.intakeParcel.update({
+        where: { id: intakeParcelId },
+        data: {
+          status: IntakeParcelStatus.ARRIVED_AT_BRANCH,
+          arrivedAt: intakeParcel.arrivedAt ?? new Date(),
+        },
+      });
+
+      const createdShipment = await tx.shipment.create({
+        data: {
+          shipment_number: shipmentNumber,
+          senderId: sender.userId,
+          receiverName: intakeParcel.full_name,
+          receiverPhone: intakeParcel.phone,
+          receiverAddress: intakeParcel.address,
+          weight: dto.weight,
+          description: intakeParcel.package_info,
+          packageDetails: dto.packageDetails || {},
+          cost,
+          hubId: intakeParcel.hubId,
+          originHubId: intakeParcel.hubId,
+          branchId,
+          deliveryHubId: dto.deliveryHubId,
+          current_status: ShipmentStatus.ARRIVED_AT_BRANCH,
+          type: dto.type ?? ShipmentType.STANDARD,
+          shipmentType: dto.shipmentType,
+        },
+      });
+
+      await tx.shipmentTimeline.create({
+        data: {
+          shipmentId: createdShipment.id,
+          status: ShipmentStatus.ARRIVED_AT_BRANCH,
+          notes: 'Shipment created from intake parcel after arriving at branch.',
+          photo_urls: intakeParcel.image_urls,
+        },
+      });
+
+      return createdShipment;
+    });
+
+    this.eventEmitter.emit('shipment.created', {
+      shipmentId: shipment.id,
+      senderId: shipment.senderId,
+      trackingNumber: shipment.tracking_number,
+      shipment_number: shipment.shipment_number,
+      receiverName: shipment.receiverName,
+    });
+
+    if (cost > 0) {
+      this.eventEmitter.emit('shipment.arrived', {
+        shipmentId: shipment.id,
+        senderId: shipment.senderId,
+        cost,
+        hubId: shipment.originHubId,
+      });
+    }
+
+    return shipment;
+  }
+
+  async assignDeliveryHub(shipmentId: string, deliveryHubId: string, branchUserId: string) {
+    const branchId = await this.getBranchIdForUser(branchUserId);
+    await this.validateDeliveryHub(deliveryHubId, branchId);
+
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id: shipmentId },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with ID ${shipmentId} not found`);
+    }
+
+    if (shipment.branchId !== branchId) {
+      throw new BadRequestException('This shipment does not belong to your branch.');
+    }
+
+    const updated = await this.prisma.shipment.update({
+      where: { id: shipmentId },
+      data: {
+        deliveryHubId,
+        current_status: ShipmentStatus.OUT_OF_DELIVERY,
+      },
+    });
+
+    await this.prisma.shipmentTimeline.create({
+      data: {
+        shipmentId,
+        status: ShipmentStatus.OUT_OF_DELIVERY,
+        notes: 'Shipment assigned to delivery hub.',
+      },
+    });
+
+    this.eventEmitter.emit('shipment.status_updated', {
+      shipmentId,
+      senderId: shipment.senderId,
+      status: ShipmentStatus.OUT_OF_DELIVERY,
+      notes: 'Shipment assigned to delivery hub.',
+    });
+
+    return updated;
+  }
+
   async updateStatus(shipmentId: string, status: ShipmentStatus, notes?: string, photoUrls: string[] = []) {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: shipmentId },
@@ -560,6 +788,8 @@ export class ShipmentService {
           rewards: true,
           branch: true,
           hub: true,
+          originHub: true,
+          deliveryHub: true,
           sender: { include: { profile: true } },
           container: true,
         },
@@ -606,6 +836,8 @@ export class ShipmentService {
           rewards: true,
           branch: true,
           hub: true,
+          originHub: true,
+          deliveryHub: true,
           sender: { include: { profile: true } },
           container: true,
         },
@@ -719,6 +951,8 @@ export class ShipmentService {
           rewards: true,
           branch: true,
           hub: true,
+          originHub: true,
+          deliveryHub: true,
           sender: { include: { profile: true } },
           container: true,
         },
@@ -747,5 +981,124 @@ export class ShipmentService {
       throw new NotFoundException(`Container with ID ${id} not found`);
     }
     return container;
+  }
+
+  async getBranchIncomingShipments(userId: string, query: PaginationQueryDto) {
+    const branchId = await this.getBranchIdForUser(userId);
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      branchId,
+      current_status: status ?? ShipmentStatus.ARRIVED_AT_BRANCH,
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverPhone: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { shipment_number: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { sender: { include: { profile: true } }, originHub: true, deliveryHub: true, branch: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.shipment.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  async getBranchOutgoingShipments(userId: string, query: PaginationQueryDto) {
+    const branchId = await this.getBranchIdForUser(userId);
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      branchId,
+      deliveryHubId: { not: null },
+      ...(status ? { current_status: status } : {}),
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverPhone: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { shipment_number: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { sender: { include: { profile: true } }, originHub: true, deliveryHub: true, branch: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.shipment.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  async getDeliveryHubIncomingShipments(userId: string, query: PaginationQueryDto) {
+    const hub = await this.prisma.hub.findFirst({ where: { hubProviderId: userId } });
+    if (!hub) {
+      throw new NotFoundException('No hub is assigned to this hub provider.');
+    }
+
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      deliveryHubId: hub.id,
+      ...(status ? { current_status: status } : {}),
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverPhone: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { shipment_number: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { sender: { include: { profile: true } }, originHub: true, deliveryHub: true, branch: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.shipment.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
   }
 }

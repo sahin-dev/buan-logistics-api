@@ -6,6 +6,7 @@ model Branch {
     latitude  Float?
     longitude Float?
     hubs      Hub[]
+    users     User[]      @relation("BranchUsers")
     shipments Shipment[]  @relation("BranchShipments")
     containers Container[] @relation("BranchContainers")
     createdAt DateTime    @default(now())
@@ -24,6 +25,9 @@ model Hub {
     branch               Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
     hubProvider          User?           @relation(fields: [hubProviderId], references: [id])
     shipments            Shipment[]      @relation("HubShipments")
+    originShipments      Shipment[]      @relation("OriginHubShipments")
+    deliveryShipments    Shipment[]      @relation("DeliveryHubShipments")
+    intakeParcels        IntakeParcel[]
     commissions          HubCommission[]
     createdAt            DateTime        @default(now())
     updatedAt            DateTime        @updatedAt

@@ -13,6 +13,7 @@ import { CreateT1ShipmentDto } from './dtos/create-t1-shipment.dto';
 import { CreateT2T3ShipmentDto } from './dtos/create-t2t3-shipment.dto';
 import { CreateCorporateShipmentDto } from './dtos/create-corporate-shipment.dto';
 import { CreateContainerDto } from './dtos/create-container.dto';
+import { CreateShipmentFromIntakeDto } from './dtos/create-shipment-from-intake.dto';
 import { JwtAuthGuard } from 'src/common/guards/auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -53,6 +54,25 @@ export class ShipmentController {
   @ApiOperation({ summary: 'Create corporate partner shipment (Corporate Partner / Admin / Branch Staff)' })
   async createCorporateShipment(@Body() dto: CreateCorporateShipmentDto) {
     return this.shipmentService.createCorporateShipment(dto);
+  }
+
+  @Post('from-intake/:intakeParcelId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRANCH)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Branch creates a shipment from an intake parcel that arrived at branch',
+  })
+  async createShipmentFromIntake(
+    @Param('intakeParcelId') intakeParcelId: string,
+    @Body() dto: CreateShipmentFromIntakeDto,
+    @Request() req: any,
+  ) {
+    return this.shipmentService.createFromIntakeParcel(
+      intakeParcelId,
+      dto,
+      req.payload.userId,
+    );
   }
 
   @Put(':id/pickup')
@@ -107,6 +127,28 @@ export class ShipmentController {
     @Body('branchId') branchId: string,
   ) {
     return this.shipmentService.arriveAtBranch(id, cost, branchId);
+  }
+
+  @Put(':id/delivery-hub')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRANCH)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Assign a delivery hub to a branch shipment' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        deliveryHubId: { type: 'string', example: 'delivery-hub-uuid' },
+      },
+      required: ['deliveryHubId'],
+    },
+  })
+  async assignDeliveryHub(
+    @Param('id') id: string,
+    @Body('deliveryHubId') deliveryHubId: string,
+    @Request() req: any,
+  ) {
+    return this.shipmentService.assignDeliveryHub(id, deliveryHubId, req.payload.userId);
   }
 
   @Put(':id/status')
@@ -188,6 +230,33 @@ export class ShipmentController {
   @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
   async getAllShipmentsForAdmin(@Query() query: PaginationQueryDto) {
     return this.shipmentService.getAllShipmentsForAdmin(query);
+  }
+
+  @Get('branch/incoming')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRANCH)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Branch dashboard: incoming shipments for logged-in branch' })
+  async getBranchIncomingShipments(@Request() req: any, @Query() query: PaginationQueryDto) {
+    return this.shipmentService.getBranchIncomingShipments(req.payload.userId, query);
+  }
+
+  @Get('branch/outgoing')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.BRANCH)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Branch dashboard: outgoing shipments assigned to delivery hubs' })
+  async getBranchOutgoingShipments(@Request() req: any, @Query() query: PaginationQueryDto) {
+    return this.shipmentService.getBranchOutgoingShipments(req.payload.userId, query);
+  }
+
+  @Get('delivery-hub/incoming')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HUB_PROIVDER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Hub provider dashboard: incoming shipments assigned for delivery' })
+  async getDeliveryHubIncomingShipments(@Request() req: any, @Query() query: PaginationQueryDto) {
+    return this.shipmentService.getDeliveryHubIncomingShipments(req.payload.userId, query);
   }
 
   @Get('admin/:id')

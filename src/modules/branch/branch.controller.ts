@@ -78,6 +78,18 @@ export class BranchController {
     return this.branchService.assignHubProvider(id, providerId);
   }
 
+  @Put(':id/assign-user/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Assign a user as branch admin/staff for a branch (Admin only)' })
+  async assignBranchUser(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.branchService.assignBranchUser(id, userId);
+  }
+
   // ─── Hub Commission Endpoints ──────────────────────────────────────────────
 
   @Get('hubs/:id/commissions')

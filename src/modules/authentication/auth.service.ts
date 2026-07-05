@@ -45,6 +45,7 @@ export class AuthService {
         try {
             // Hash password
             const hashedPassword = await this.passwordHasher.hashPassword(password);
+            const referralCode = await this.generateUniqueReferralCode();
 
             // Create user with profile
             const user = await this.prismaService.user.create({
@@ -53,6 +54,7 @@ export class AuthService {
                     password: hashedPassword,
                     provider: "local",
                     role: "USER",
+                    referralCode,
                     profile: {
                         create: {
                             firstName,
@@ -168,6 +170,19 @@ export class AuthService {
             where: { email },
         });
         return !existingUser;
+    }
+
+    private async generateUniqueReferralCode(): Promise<string> {
+        while (true) {
+            const suffix = Math.floor(100000 + Math.random() * 900000).toString();
+            const referralCode = `REF${suffix}`;
+            const existing = await this.prismaService.user.findUnique({
+                where: { referralCode },
+            });
+            if (!existing) {
+                return referralCode;
+            }
+        }
     }
 
     /**

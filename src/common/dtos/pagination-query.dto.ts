@@ -10,7 +10,7 @@ export class PaginationQueryDto {
   @Min(1)
   page: number = 1;
 
-  @ApiProperty({ example: 10, required: false, description: 'Number of items per page (max 100)', default: 10 })
+  @ApiProperty({example:10,  required: false, description: 'Number of items per page (max 100)', default: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -18,27 +18,27 @@ export class PaginationQueryDto {
   @Max(100)
   limit: number = 10;
 
-  @ApiPropertyOptional({ example: 'john', description: 'Optional search keyword across common text fields' })
+  @ApiPropertyOptional({  description: 'Optional search keyword across common text fields' })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ example: 'PENDING', description: 'Filter by status where supported' })
+  @ApiPropertyOptional({  description: 'Filter by status where supported' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ example: 'ADMIN', description: 'Filter by role where supported' })
+  @ApiPropertyOptional({  description: 'Filter by role where supported' })
   @IsOptional()
   @IsString()
   role?: string;
 
-  @ApiPropertyOptional({ example: 'AIR_CARGO', description: 'Filter by reward type where supported' })
+  @ApiPropertyOptional({  description: 'Filter by reward type where supported' })
   @IsOptional()
   @IsString()
   rewardType?: string;
 
-  @ApiPropertyOptional({ example: 'true', description: 'Filter by active/inactive state where supported' })
+  @ApiPropertyOptional({  description: 'Filter by active/inactive state where supported' })
   @IsOptional()
   @Transform(({ value }) => {
     if (value === null || value === undefined) return undefined;
@@ -54,22 +54,22 @@ export class PaginationQueryDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ example: '2024-01-01', description: 'Filter records created on or after this date' })
+  @ApiPropertyOptional({  description: 'Filter records created on or after this date' })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ example: '2024-12-31', description: 'Filter records created on or before this date' })
+  @ApiPropertyOptional({  description: 'Filter records created on or before this date' })
   @IsOptional()
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({ example: 'AIR_CARGO', description: 'Filter by shipment mode/type where supported' })
+  @ApiPropertyOptional({  description: 'Filter by shipment mode/type where supported' })
   @IsOptional()
   @IsString()
   shipmentType?: string;
 
-  @ApiPropertyOptional({ example: 'Pending', description: 'Filter by application status where supported' })
+  @ApiPropertyOptional({  description: 'Filter by application status where supported' })
   @IsOptional()
   @IsString()
   applicationStatus?: string;

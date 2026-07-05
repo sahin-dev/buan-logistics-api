@@ -1,0 +1,2 @@
+-- No-op.
+-- The intake_parcels table is created later with the package_info column.

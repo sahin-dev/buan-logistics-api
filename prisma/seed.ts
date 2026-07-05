@@ -24,6 +24,7 @@ import {
   Tier,
   Role,
   OperationMode,
+  IntakeParcelStatus,
 } from "../generated/prisma/client";
 
 const prisma = new PrismaClient({
@@ -34,10 +35,10 @@ const prisma = new PrismaClient({
 
 async function main() {
   const now = new Date();
-  const hashedPassword = await bcrypt.hash("Password123!", 10);
+  const hashedPassword = await bcrypt.hash("user1234", 10);
   const adminHashedPassword = await bcrypt.hash("admin1234", 10);
-  const hubProviderHashedPassword = await bcrypt.hash("hubprovider123", 10);
-
+  const hubProviderHashedPassword = await bcrypt.hash("hubprovider1234", 10);
+  const branchManagerHashedPassword = await bcrypt.hash("branch1234", 10);
   await prisma.$transaction(async (tx) => {
     await tx.hubCommission.deleteMany();
     await tx.userRewardProgress.deleteMany();
@@ -48,6 +49,7 @@ async function main() {
     await tx.shipmentTimeline.deleteMany();
     await tx.shipment.deleteMany();
     await tx.container.deleteMany();
+    await tx.intakeParcel.deleteMany();
     await tx.hub.deleteMany();
     await tx.branch.deleteMany();
     await tx.notification.deleteMany();
@@ -70,51 +72,77 @@ async function main() {
         email: "admin@buanenterprise.com",
         password:adminHashedPassword,
         provider: "local",
-        tier: Tier.T1,
         role: Role.ADMIN,
+        referralCode: "REF100001",
       },
     });
-
     const customerUser = await tx.user.create({
       data: {
         id: randomUUID(),
-        email: "customer@angel1951.test",
+        email: "customer@buanenterprise.com",
+        password: hashedPassword,
+        provider: "local",
+        tier: Tier.T1,
+        role: Role.USER,
+        referralCode: "REF100002",
+      }
+      })
+
+    const businessUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "business@buanenterprise.com",
         password: hashedPassword,
         provider: "local",
         tier: Tier.T2,
         role: Role.USER,
+        referralCode: "REF100003",
+      },
+    });
+
+    const containerUser = await tx.user.create({
+      data: {
+        id: randomUUID(),
+        email: "container@buanenterprise.com",
+        password: hashedPassword,
+        provider: "local",
+        tier: Tier.T3,
+        role: Role.USER,
+        referralCode: "REF100004",
       },
     });
 
     const corporateUser = await tx.user.create({
       data: {
         id: randomUUID(),
-        email: "corporate@angel1951.test",
+        email: "corporate@buanenterprise.com",
         password: hashedPassword,
         provider: "local",
-        tier: Tier.T3,
         role: Role.CORPORATE_PARTNER,
+        referralCode: "REF100005",
       },
     });
 
     const hubProviderUser = await tx.user.create({
       data: {
         id: randomUUID(),
-        email: "branch@buanenterprise.com",
+        email: "hub@buanenterprise.com",
         password: hubProviderHashedPassword,
         provider: "local",
         tier: Tier.T2,
         role: Role.HUB_PROIVDER,
+        referralCode: "REF100006",
       },
     });
 
-    await tx.user.create({
+    const branchManagerUser = await tx.user.create({
       data: {
         id: randomUUID(),
-        email: "branch_manager@buanenterprise.com",
-        password: hubProviderHashedPassword,
+        email: "branch@buanenterprise.com",
+        password: branchManagerHashedPassword,
         provider: "local",
         role: Role.BRANCH,
+        referralCode: "REF100007",
       },
     });
 
@@ -131,7 +159,7 @@ async function main() {
 
     await tx.businessProfile.create({
       data: {
-        userId: customerUser.id,
+        userId: businessUser.id,
         autorizedPersonFullName: "Ada Lovelace",
         authorizedPersonTitle: "Operations Lead",
         companyName: "Bright Logistics",
@@ -141,6 +169,27 @@ async function main() {
         address: "5 Market Street",
         email: "ops@brightlogistics.test",
         phone: "+2348000000001",
+        website: "https://brightlogistics.test",
+        type: "Logistics",
+        status: ApplicationStatus.Pending,
+        operation_mode: OperationMode.Both,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    await tx.businessProfile.create({
+      data: {
+        userId: containerUser.id,
+        autorizedPersonFullName: "Ada Lovelace",
+        authorizedPersonTitle: "Operations Lead",
+        companyName: "Bright Logistics",
+        tradingName: "Bright Logistics",
+        Reg_no: "REG-1001",
+        country: "Nigeria",
+        address: "5 Market Street",
+        email: "abc@brightlogistics.test",
+        phone: "+2348000000002",
         website: "https://brightlogistics.test",
         type: "Logistics",
         status: ApplicationStatus.Pending,
@@ -265,10 +314,58 @@ async function main() {
         id: randomUUID(),
         referrerUserId: adminUser.id,
         referredEmail: "newuser@angel1951.test",
-        referralCode: "REF-ANGEL-001",
+        referralCode: adminUser.referralCode!,
         status: ReferralStatus.PENDING,
         rewardPoints: 25,
       },
+    });
+
+    await tx.referral.createMany({
+      data: [
+        {
+          id: randomUUID(),
+          referrerUserId: customerUser.id,
+          referredEmail: businessUser.email,
+          referredUserId: businessUser.id,
+          referralCode: customerUser.referralCode!,
+          status: ReferralStatus.COMPLETED,
+          rewardPoints: 20,
+          createdAt: new Date("2026-02-10T09:00:00.000Z"),
+          updatedAt: new Date("2026-02-10T09:00:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          referrerUserId: customerUser.id,
+          referredEmail: containerUser.email,
+          referredUserId: containerUser.id,
+          referralCode: customerUser.referralCode!,
+          status: ReferralStatus.COMPLETED,
+          rewardPoints: 20,
+          createdAt: new Date("2026-02-10T10:00:00.000Z"),
+          updatedAt: new Date("2026-02-10T10:00:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          referrerUserId: customerUser.id,
+          referredEmail: "pending.friend@buanenterprise.com",
+          referralCode: customerUser.referralCode!,
+          status: ReferralStatus.PENDING,
+          rewardPoints: 0,
+          createdAt: new Date("2026-02-10T11:00:00.000Z"),
+          updatedAt: new Date("2026-02-10T11:00:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          referrerUserId: customerUser.id,
+          referredEmail: corporateUser.email,
+          referredUserId: corporateUser.id,
+          referralCode: customerUser.referralCode!,
+          status: ReferralStatus.COMPLETED,
+          rewardPoints: 20,
+          createdAt: new Date("2026-02-10T12:00:00.000Z"),
+          updatedAt: new Date("2026-02-10T12:00:00.000Z"),
+        },
+      ],
     });
 
     await tx.passwordResetToken.create({
@@ -299,7 +396,12 @@ async function main() {
       },
     });
 
-    const hub = await tx.hub.create({
+    await tx.user.update({
+      where: { id: branchManagerUser.id },
+      data: { branchId: branch.id },
+    });
+
+    const originHub = await tx.hub.create({
       data: {
         id: randomUUID(),
         name: "Lagos Transit Hub",
@@ -307,6 +409,61 @@ async function main() {
         branchId: branch.id,
         hubProviderId: hubProviderUser.id,
         commissionPerPackage: 5.5,
+      },
+    });
+
+    const deliveryHub = await tx.hub.create({
+      data: {
+        id: randomUUID(),
+        name: "Victoria Island Delivery Hub",
+        address: "19 Ahmadu Bello Way",
+        branchId: branch.id,
+        commissionPerPackage: 4.0,
+      },
+    });
+
+    const intakeParcel = await tx.intakeParcel.create({
+      data: {
+        id: randomUUID(),
+        intake_number: "TRK0001",
+        hubId: originHub.id,
+        full_name: "Grace Thompson",
+        phone: "+2348000000002",
+        address: "21 Harbor Street",
+        package_info: "Electronics parcel from intake flow",
+        image_urls: ["uploads/seed-intake-electronics.jpg"],
+        status: IntakeParcelStatus.ARRIVED_AT_BRANCH,
+        handedOverAt: now,
+        arrivedAt: now,
+      },
+    });
+
+    await tx.intakeParcel.create({
+      data: {
+        id: randomUUID(),
+        intake_number: "TRK0002",
+        hubId: originHub.id,
+        full_name: "Aisha Bello",
+        phone: "+2348000000088",
+        address: "31 Broad Street",
+        package_info: "Clothing parcel handed over to branch",
+        image_urls: ["uploads/seed-intake-clothing.jpg"],
+        status: IntakeParcelStatus.HANDED_OVER,
+        handedOverAt: now,
+      },
+    });
+
+    await tx.intakeParcel.create({
+      data: {
+        id: randomUUID(),
+        intake_number: "TRK0003",
+        hubId: originHub.id,
+        full_name: "Samuel Okoro",
+        phone: "+2348000000099",
+        address: "42 Allen Avenue",
+        package_info: "Documents awaiting branch arrival",
+        image_urls: ["uploads/seed-intake-documents.jpg"],
+        status: IntakeParcelStatus.AWAITING_PICKUP,
       },
     });
 
@@ -333,18 +490,43 @@ async function main() {
         description: "Electronics parcel",
         packageDetails: { dimensions: "40x30x20", category: "electronics" },
         containerDetails: { containerType: "FULL" },
-        hubId: hub.id,
+        hubId: originHub.id,
+        originHubId: originHub.id,
         branchId: branch.id,
+        deliveryHubId: deliveryHub.id,
         cost: 120.75,
         shipped_at: now,
         delivered_at: now,
         current_status: ShipmentStatus.DELIVERED,
         type: ShipmentType.EXPRESS,
+        shipmentType: ShipmentMode.AIR_CARGO,
         pickupContactName: "Ada Lovelace",
         pickupContactPhone: "+2348000000000",
         pickupAddress: "12 Sample Drive",
         scheduledPickupDate: now,
         containerId: container.id,
+      },
+    });
+
+    const intakeShipment = await tx.shipment.create({
+      data: {
+        id: randomUUID(),
+        shipment_number: "BN-2026-000002",
+        senderId: customerUser.id,
+        receiverName: intakeParcel.full_name,
+        receiverPhone: intakeParcel.phone,
+        receiverAddress: intakeParcel.address,
+        weight: 4.2,
+        description: intakeParcel.package_info,
+        packageDetails: { source: "intake-parcel-seed" },
+        hubId: intakeParcel.hubId,
+        originHubId: intakeParcel.hubId,
+        branchId: branch.id,
+        deliveryHubId: deliveryHub.id,
+        cost: 45.5,
+        current_status: ShipmentStatus.ARRIVED_AT_BRANCH,
+        type: ShipmentType.STANDARD,
+        shipmentType: ShipmentMode.SEA_CARGO,
       },
     });
 
@@ -354,6 +536,15 @@ async function main() {
         status: ShipmentStatus.PENDING,
         notes: "Shipment created and prepared for pickup",
         photo_urls: ["https://example.com/label-1.jpg"],
+      },
+    });
+
+    await tx.shipmentTimeline.create({
+      data: {
+        shipmentId: intakeShipment.id,
+        status: ShipmentStatus.ARRIVED_AT_BRANCH,
+        notes: "Shipment created from arrived intake parcel at branch",
+        photo_urls: intakeParcel.image_urls,
       },
     });
 
@@ -469,6 +660,48 @@ async function main() {
       },
     });
 
+    await tx.reward.createMany({
+      data: [
+        {
+          id: randomUUID(),
+          userId: customerUser.id,
+          source: RewardSource.REFERRAL,
+          description: "Air Cargo Shipment +1",
+          points: 20,
+          claimed: false,
+          createdAt: new Date("2026-02-10T09:05:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          userId: customerUser.id,
+          source: RewardSource.REFERRAL,
+          description: "Air Cargo Shipment +1",
+          points: 20,
+          claimed: true,
+          claimedAt: new Date("2026-02-12T09:05:00.000Z"),
+          createdAt: new Date("2026-02-10T10:05:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          userId: customerUser.id,
+          source: RewardSource.REFERRAL,
+          description: "Air Cargo Shipment +1",
+          points: 20,
+          claimed: false,
+          createdAt: new Date("2026-02-10T12:05:00.000Z"),
+        },
+        {
+          id: randomUUID(),
+          userId: adminUser.id,
+          source: RewardSource.REFERRAL,
+          description: "Referral invitation pending bonus",
+          points: 0,
+          claimed: false,
+          createdAt: new Date("2026-02-10T13:05:00.000Z"),
+        },
+      ],
+    });
+
     await tx.notification.create({
       data: {
         id: randomUUID(),
@@ -505,7 +738,7 @@ async function main() {
     await tx.hubCommission.create({
       data: {
         id: randomUUID(),
-        hubId: hub.id,
+        hubId: originHub.id,
         shipmentId: shipment.id,
         amount: 5.5,
         status: CommissionStatus.PENDING,

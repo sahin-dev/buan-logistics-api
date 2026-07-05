@@ -264,4 +264,68 @@ export class InvoiceService {
       shipmentsCount: shipments.length,
     };
   }
+
+
+ getAllInvoices = async (query: PaginationQueryDto) => {
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      ...(search ? { invoice_number: { contains: search, mode: 'insensitive' } } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { shipment: true, payments: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  getBranchInvoices = async (branchId: string, query: PaginationQueryDto) => {
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      shipment: {
+        branchId,
+      },
+      ...(search ? { invoice_number: { contains: search, mode: 'insensitive' } } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { shipment: true, payments: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  
 }

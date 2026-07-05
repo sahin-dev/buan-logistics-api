@@ -53,7 +53,7 @@ export class BranchService {
   async getBranchById(id: string) {
     const branch = await this.prisma.branch.findUnique({
       where: { id },
-      include: { hubs: true },
+      include: { hubs: true, users: { include: { profile: true }, omit: { password: true } } },
     });
     if (!branch) {
       throw new NotFoundException(`Branch with ID ${id} not found`);
@@ -166,6 +166,35 @@ export class BranchService {
       where: { id: hubId },
       data: { hubProviderId },
       include: { hubProvider: { include: { profile: true } } },
+    });
+  }
+
+  async assignBranchUser(branchId: string, userId: string) {
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+    });
+    if (!branch) {
+      throw new NotFoundException(`Branch with ID ${branchId} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        branchId,
+        role: 'BRANCH',
+      },
+      include: {
+        profile: true,
+        branch: true,
+      },
+      omit: { password: true },
     });
   }
 

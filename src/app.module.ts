@@ -17,6 +17,7 @@ import dbConfig from './config/db.config';
 import smtpConfig from './config/smtp.config';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { QuoteModule } from './modules/quote/quote.module';
+import { IntakeParcelModule } from './modules/intake-parcel/intake-parcel.module';
 
 @Module({
   imports: [
@@ -36,7 +37,8 @@ import { QuoteModule } from './modules/quote/quote.module';
     NotificationModule,
     ReferralModule,
     FileUploadModule,
-    QuoteModule
+    QuoteModule,
+    IntakeParcelModule
   ],
   controllers: [AppController],
   providers: [AppService],

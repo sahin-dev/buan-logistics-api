@@ -18,10 +18,14 @@ model Shipment {
     containerDetails Json? // T3 full container details
 
     // Locations
-    hubId    String? // Nullable (T2/T3 go to branch directly)
-    hub      Hub?    @relation("HubShipments", fields: [hubId], references: [id])
-    branchId String?
-    branch   Branch? @relation("BranchShipments", fields: [branchId], references: [id])
+    hubId         String? // Legacy/primary hub reference
+    hub           Hub?    @relation("HubShipments", fields: [hubId], references: [id])
+    originHubId   String?
+    originHub     Hub?    @relation("OriginHubShipments", fields: [originHubId], references: [id])
+    branchId      String?
+    branch        Branch? @relation("BranchShipments", fields: [branchId], references: [id])
+    deliveryHubId String?
+    deliveryHub   Hub?    @relation("DeliveryHubShipments", fields: [deliveryHubId], references: [id])
 
     // Cost and billing
     cost Float @default(0.0)
@@ -33,6 +37,7 @@ model Shipment {
     timeline       ShipmentTimeline[]
     current_status ShipmentStatus     @default(PENDING)
     type           ShipmentType       @default(STANDARD)
+    shipmentType   ShipmentMode?
 
     invoices       Invoice[]          @relation("SingleShipmentInvoice")
     rewards        Reward[]
@@ -57,6 +62,9 @@ model Shipment {
 
     @@index([id, tracking_number])
     @@index([senderId])
+    @@index([originHubId])
+    @@index([branchId])
+    @@index([deliveryHubId])
     @@index([current_status])
     @@index([createdAt])
     @@map("shipments")
