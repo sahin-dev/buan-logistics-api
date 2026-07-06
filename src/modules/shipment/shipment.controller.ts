@@ -232,6 +232,24 @@ export class ShipmentController {
     return this.shipmentService.getAllShipmentsForAdmin(query);
   }
 
+  @Get('admin/branch/:branchId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'branchId', description: 'Branch ID (UUID)' })
+  @ApiOperation({ summary: 'Get shipments for a branch and reset its new shipment counter (Admin only)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by tracking number, receiver name, address, or sender email' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by shipment status' })
+  @ApiQuery({ name: 'shipmentType', required: false, type: String, description: 'Filter by shipment mode/type' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
+  async getShipmentsByBranchForAdmin(
+    @Param('branchId') branchId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.shipmentService.getShipmentsByBranchIdForAdmin(branchId, query);
+  }
+
   @Get('branch/incoming')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.BRANCH)

@@ -130,6 +130,28 @@ export class ShipmentService {
     return deliveryHub;
   }
 
+  private async markBranchHasNewShipment(branchId?: string | null) {
+    if (!branchId) return;
+
+    await this.prisma.branch.update({
+      where: { id: branchId },
+      data: {
+        new_shipment: true,
+        new_shipment_count: { increment: 1 },
+      },
+    });
+  }
+
+  private async resetBranchNewShipmentCounter(branchId: string) {
+    await this.prisma.branch.update({
+      where: { id: branchId },
+      data: {
+        new_shipment: false,
+        new_shipment_count: 0,
+      },
+    });
+  }
+
   async createT1Shipment(dto: CreateT1ShipmentDto) {
     // 1. Search sender by email
     const existingUser = await this.prisma.user.findUnique({
@@ -370,6 +392,8 @@ export class ShipmentService {
       },
     });
 
+    await this.markBranchHasNewShipment(dto.branchId);
+
     // Add timeline
     await this.prisma.shipmentTimeline.create({
       data: {
@@ -437,6 +461,8 @@ export class ShipmentService {
         type: dto.type,
       },
     });
+
+    await this.markBranchHasNewShipment(dto.branchId);
 
     // Add timeline
     await this.prisma.shipmentTimeline.create({
@@ -510,6 +536,10 @@ export class ShipmentService {
         branchId,
       },
     });
+
+    if (shipment.branchId !== branchId || shipment.current_status !== ShipmentStatus.ARRIVED_AT_BRANCH) {
+      await this.markBranchHasNewShipment(branchId);
+    }
 
     await this.prisma.shipmentTimeline.create({
       data: {
@@ -607,6 +637,8 @@ export class ShipmentService {
       shipment_number: shipment.shipment_number,
       receiverName: shipment.receiverName,
     });
+
+    await this.markBranchHasNewShipment(branchId);
 
     if (cost > 0) {
       this.eventEmitter.emit('shipment.arrived', {
@@ -849,6 +881,65 @@ export class ShipmentService {
     return PaginatedResponseDto.create(data, totalItems, page, limit);
   }
 
+  async getShipmentsByBranchIdForAdmin(branchId: string, query: PaginationQueryDto) {
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true },
+    });
+    if (!branch) {
+      throw new NotFoundException(`Branch with ID ${branchId} not found`);
+    }
+
+    const { page, limit, search, status, shipmentType, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      branchId,
+      ...(search ? {
+        OR: [
+          { receiverName: { contains: search, mode: 'insensitive' } },
+          { receiverAddress: { contains: search, mode: 'insensitive' } },
+          { shipment_number: { contains: search, mode: 'insensitive' } },
+          { tracking_number: { contains: search, mode: 'insensitive' } },
+          { sender: { email: { contains: search, mode: 'insensitive' } } },
+        ],
+      } : {}),
+      ...(status ? { current_status: status } : {}),
+      ...(shipmentType ? { shipmentType } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          timeline: { orderBy: { timestamp: 'asc' } },
+          invoices: true,
+          rewards: true,
+          branch: true,
+          hub: true,
+          originHub: true,
+          deliveryHub: true,
+          sender: { include: { profile: true } },
+          container: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.shipment.count({ where }),
+    ]);
+
+    await this.resetBranchNewShipmentCounter(branchId);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
   async createContainer(dto: CreateContainerDto) {
     const branch = await this.prisma.branch.findUnique({
       where: { id: dto.branchId },
@@ -1018,6 +1109,8 @@ export class ShipmentService {
       this.prisma.shipment.count({ where }),
     ]);
 
+    await this.resetBranchNewShipmentCounter(branchId);
+
     return PaginatedResponseDto.create(data, totalItems, page, limit);
   }
 
@@ -1056,6 +1149,8 @@ export class ShipmentService {
       }),
       this.prisma.shipment.count({ where }),
     ]);
+
+    await this.resetBranchNewShipmentCounter(branchId);
 
     return PaginatedResponseDto.create(data, totalItems, page, limit);
   }

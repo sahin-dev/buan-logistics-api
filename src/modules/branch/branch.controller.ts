@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Put, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { BranchService } from './branch.service';
 import { CreateBranchDto } from './dtos/create-branch.dto';
 import { CreateHubDto } from './dtos/create-hub.dto';
@@ -34,12 +34,6 @@ export class BranchController {
     return this.branchService.getAllBranches(query);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get branch by ID' })
-  async getBranchById(@Param('id') id: string) {
-    return this.branchService.getBranchById(id);
-  }
-
   @Post('hubs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -60,10 +54,40 @@ export class BranchController {
     return this.branchService.getAllHubs(query);
   }
 
+  @Get(':branchId/hubs')
+  @ApiParam({ name: 'branchId', description: 'Branch ID (UUID)' })
+  @ApiOperation({ summary: 'Get all hubs by branch ID (paginated, supports search and filters)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by hub name or address' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by hub status where supported' })
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: 'Filter createdAt on or after this date' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: 'Filter createdAt on or before this date' })
+  async getHubsByBranchId(
+    @Param('branchId') branchId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.branchService.getHubsByBranchId(branchId, query);
+  }
+
+  @Get('admin/hubs/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'id', description: 'Hub ID (UUID)' })
+  @ApiOperation({ summary: 'Get hub by ID (Admin only)' })
+  async getHubByIdForAdmin(@Param('id') id: string) {
+    return this.branchService.getHubById(id);
+  }
+
   @Get('hubs/:id')
   @ApiOperation({ summary: 'Get hub by ID' })
   async getHubById(@Param('id') id: string) {
     return this.branchService.getHubById(id);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get branch by ID' })
+  async getBranchById(@Param('id') id: string) {
+    return this.branchService.getBranchById(id);
   }
 
   @Put('hubs/:id/assign-provider/:providerId')

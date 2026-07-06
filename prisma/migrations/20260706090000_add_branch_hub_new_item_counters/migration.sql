@@ -1,0 +1,7 @@
+ALTER TABLE "branches"
+ADD COLUMN "new_shipment" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "new_shipment_count" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "hubs"
+ADD COLUMN "new_parcel" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "new_parcel_count" INTEGER NOT NULL DEFAULT 0;

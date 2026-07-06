@@ -17,6 +17,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -109,6 +110,52 @@ export class IntakeParcelController {
   @ApiQuery({ name: 'endDate', required: false, type: String })
   async getAll(@Query() query: PaginationQueryDto) {
     return this.intakeParcelService.getAll(query);
+  }
+
+  // @Get('admin/hubs/:hubId')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles(Role.ADMIN)
+  // @ApiBearerAuth()
+  // @ApiParam({ name: 'hubId', description: 'Hub ID (UUID)' })
+  // @ApiOperation({ summary: 'Admin: get all intake parcels for a hub and reset its new parcel counter' })
+  // @ApiQuery({ name: 'search', required: false, type: String })
+  // @ApiQuery({ name: 'status', required: false, type: String })
+  // @ApiQuery({ name: 'startDate', required: false, type: String })
+  // @ApiQuery({ name: 'endDate', required: false, type: String })
+  // async getByHubIdForAdmin(
+  //   @Param('hubId') hubId: string,
+  //   @Request() req: any,
+  //   @Query() query: PaginationQueryDto,
+  // ) {
+  //   return this.intakeParcelService.getByHubId(
+  //     hubId,
+  //     req.payload.userId,
+  //     Role.ADMIN,
+  //     query,
+  //   );
+  // }
+
+  @Get('hubs/:hubId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.BRANCH)
+  @ApiBearerAuth()
+  @ApiParam({ name: 'hubId', description: 'Hub ID (UUID)' })
+  @ApiOperation({ summary: 'Get intake parcels for a specific hub and reset its new parcel counter' })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
+  @ApiQuery({ name: 'endDate', required: false, type: String })
+  async getByHubId(
+    @Param('hubId') hubId: string,
+    @Request() req: any,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.intakeParcelService.getByHubId(
+      hubId,
+      req.payload.userId,
+      req.payload.role,
+      query,
+    );
   }
 
   @Get('my')

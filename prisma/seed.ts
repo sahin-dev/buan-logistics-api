@@ -393,6 +393,8 @@ async function main() {
         city: "Lagos",
         latitude: 6.5244,
         longitude: 3.3792,
+        new_shipment: true,
+        new_shipment_count: 2,
       },
     });
 
@@ -409,6 +411,8 @@ async function main() {
         branchId: branch.id,
         hubProviderId: hubProviderUser.id,
         commissionPerPackage: 5.5,
+        new_parcel: true,
+        new_parcel_count: 3,
       },
     });
 
@@ -482,6 +486,7 @@ async function main() {
       data: {
         id: randomUUID(),
         shipment_number: "BN-2026-000001",
+        tracking_number: "TRK-2026-000001",
         senderId: customerUser.id,
         receiverName: "Grace Thompson",
         receiverPhone: "+2348000000002",
@@ -512,6 +517,7 @@ async function main() {
       data: {
         id: randomUUID(),
         shipment_number: "BN-2026-000002",
+        tracking_number: "TRK-2026-000002",
         senderId: customerUser.id,
         receiverName: intakeParcel.full_name,
         receiverPhone: intakeParcel.phone,

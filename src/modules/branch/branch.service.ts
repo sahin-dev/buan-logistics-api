@@ -121,7 +121,7 @@ export class BranchService {
         where,
         skip,
         take: limit,
-        include: { branch: true, hubProvider: { include: { profile: true } } },
+        include: { branch: true, hubProvider: { include: { profile: true }, omit: { password: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.hub.count({ where }),
@@ -130,10 +130,61 @@ export class BranchService {
     return PaginatedResponseDto.create(data, totalItems, page, limit);
   }
 
+  async getHubsByBranchId(branchId: string, query: PaginationQueryDto) {
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true },
+    });
+    if (!branch) {
+      throw new NotFoundException(`Branch with ID ${branchId} not found`);
+    }
+
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      branchId,
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { address: { contains: search, mode: 'insensitive' } },
+        ],
+      } : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate ? {
+        createdAt: {
+          ...(startDate ? { gte: new Date(startDate) } : {}),
+          ...(endDate ? { lte: new Date(endDate) } : {}),
+        },
+      } : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.hub.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { branch: true, hubProvider: { include: { profile: true }, omit: { password: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.hub.count({ where }),
+    ]);
+
+    await this.prisma.hub.updateMany({
+      where: { branchId },
+      data: {
+        new_parcel: false,
+        new_parcel_count: 0,
+      },
+    });
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
   async getHubById(id: string) {
     const hub = await this.prisma.hub.findUnique({
       where: { id },
-      include: { branch: true, hubProvider: { include: { profile: true } } },
+      include: { branch: true, hubProvider: { include: { profile: true }, omit: { password: true } } },
     });
     if (!hub) {
       throw new NotFoundException(`Hub with ID ${id} not found`);

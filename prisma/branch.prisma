@@ -9,6 +9,8 @@ model Branch {
     users     User[]      @relation("BranchUsers")
     shipments Shipment[]  @relation("BranchShipments")
     containers Container[] @relation("BranchContainers")
+    new_shipment Boolean  @default(false)
+    new_shipment_count Int @default(0)
     createdAt DateTime    @default(now())
     updatedAt DateTime    @updatedAt
 
@@ -29,6 +31,8 @@ model Hub {
     deliveryShipments    Shipment[]      @relation("DeliveryHubShipments")
     intakeParcels        IntakeParcel[]
     commissions          HubCommission[]
+    new_parcel           Boolean         @default(false)
+    new_parcel_count     Int             @default(0)
     createdAt            DateTime        @default(now())
     updatedAt            DateTime        @updatedAt
 

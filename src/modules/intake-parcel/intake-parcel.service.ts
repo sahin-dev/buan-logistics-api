@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateIntakeParcelDto } from './dtos/create-intake-parcel.dto';
-import { IntakeParcelStatus } from 'generated/prisma/enums';
+import { IntakeParcelStatus, Role } from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
 
@@ -48,28 +48,50 @@ export class IntakeParcelService {
     return user.branchId;
   }
 
+  private async resetHubNewParcelCounter(hubId: string) {
+    await this.prisma.hub.update({
+      where: { id: hubId },
+      data: {
+        new_parcel: false,
+        new_parcel_count: 0,
+      },
+    });
+  }
+
   async create(dto: CreateIntakeParcelDto, imageUrls: string[], userId: string) {
     const hubId = await this.getHubIdForProvider(userId);
     const intakeNumber = await this.generateUniqueIntakeNumber();
 
-    return this.prisma.intakeParcel.create({
-      data: {
-        intake_number: intakeNumber,
-        hubId,
-        full_name: dto.full_name,
-        phone: dto.phone,
-        address: dto.address,
-        package_info: dto.package_info,
-        image_urls: imageUrls,
-        status: IntakeParcelStatus.AWAITING_PICKUP,
-      },
-      include: {
-        hub: {
-          include: {
-            hubProvider: { include: { profile: true }, omit: { password: true } },
+    return this.prisma.$transaction(async (tx) => {
+      const parcel = await tx.intakeParcel.create({
+        data: {
+          intake_number: intakeNumber,
+          hubId,
+          full_name: dto.full_name,
+          phone: dto.phone,
+          address: dto.address,
+          package_info: dto.package_info,
+          image_urls: imageUrls,
+          status: IntakeParcelStatus.AWAITING_PICKUP,
+        },
+        include: {
+          hub: {
+            include: {
+              hubProvider: { include: { profile: true }, omit: { password: true } },
+            },
           },
         },
-      },
+      });
+
+      await tx.hub.update({
+        where: { id: hubId },
+        data: {
+          new_parcel: true,
+          new_parcel_count: { increment: 1 },
+        },
+      });
+
+      return parcel;
     });
   }
 
@@ -222,6 +244,73 @@ export class IntakeParcelService {
       }),
       this.prisma.intakeParcel.count({ where }),
     ]);
+
+    await this.resetHubNewParcelCounter(hub.id);
+
+    return PaginatedResponseDto.create(data, totalItems, page, limit);
+  }
+
+  async getByHubId(hubId: string, userId: string, role: Role, query: PaginationQueryDto) {
+    const hub = await this.prisma.hub.findUnique({
+      where: { id: hubId },
+      select: { id: true, branchId: true },
+    });
+    if (!hub) {
+      throw new NotFoundException(`Hub with ID ${hubId} not found`);
+    }
+
+    if (role === Role.BRANCH) {
+      const branchId = await this.getBranchIdForUser(userId);
+      if (hub.branchId !== branchId) {
+        throw new BadRequestException('This hub does not belong to your branch.');
+      }
+    }
+
+    const { page, limit, search, status, startDate, endDate } = query;
+    const skip = query.getSkip();
+
+    const where: any = {
+      hubId,
+      ...(search
+        ? {
+            OR: [
+              { intake_number: { contains: search, mode: 'insensitive' } },
+              { full_name: { contains: search, mode: 'insensitive' } },
+              { phone: { contains: search, mode: 'insensitive' } },
+              { address: { contains: search, mode: 'insensitive' } },
+              { package_info: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(status ? { status } : {}),
+      ...(startDate || endDate
+        ? {
+            createdAt: {
+              ...(startDate ? { gte: new Date(startDate) } : {}),
+              ...(endDate ? { lte: new Date(endDate) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [data, totalItems] = await Promise.all([
+      this.prisma.intakeParcel.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          hub: {
+            include: {
+              hubProvider: { include: { profile: true }, omit: { password: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.intakeParcel.count({ where }),
+    ]);
+
+    await this.resetHubNewParcelCounter(hubId);
 
     return PaginatedResponseDto.create(data, totalItems, page, limit);
   }
