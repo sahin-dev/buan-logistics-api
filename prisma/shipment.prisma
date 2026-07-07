@@ -6,16 +6,30 @@ model Shipment {
 
     sender          User    @relation("SentShipments", fields: [senderId], references: [id])
 
+    // Sender snapshot captured at shipment creation
+    senderName    String?
+    senderPhone   String?
+    senderEmail   String?
+    senderAddress String?
+    senderCountry String?
+
     // Receiver Info
     receiverName    String
     receiverPhone   String
     receiverAddress String
+    receiverEmail   String?
+    receiverCountry String?
+    receiverPostalCode String?
 
     // Package details
     weight           Float
     description      String?
     packageDetails   Json? // For dimensions, category etc.
     containerDetails Json? // T3 full container details
+    insurance        Boolean @default(false)
+    valueOfGoods     String?
+    packageImageUrl  String?
+    pickupType       PickupType?
 
     // Locations
     hubId         String? // Legacy/primary hub reference
@@ -29,6 +43,11 @@ model Shipment {
 
     // Cost and billing
     cost Float @default(0.0)
+    shipmentRoute      ShipmentRoute? @default(NIGERIA_TO_ABROAD)
+    shipmentService    ShipmentServiceOption?
+    paymentServiceType String?
+    paymentCurrencyType String?
+    amountPayable      Float?
 
     // Lifecycle timestamps
     shipped_at   DateTime?
@@ -36,8 +55,7 @@ model Shipment {
 
     timeline       ShipmentTimeline[]
     current_status ShipmentStatus     @default(PENDING)
-    type           ShipmentType       @default(STANDARD)
-    shipmentType   ShipmentMode?
+    shipmentType   ShipmentType?
 
     invoices       Invoice[]          @relation("SingleShipmentInvoice")
     rewards        Reward[]
@@ -126,14 +144,25 @@ enum ShipmentStatus {
 }
 
 enum ShipmentType {
+    AIR_CARGO
+    SEA_CARGO
+    EXPRESS_SHIPMENT
     STANDARD
-    EXPRESS
     OVERNIGHT
     CONSOLIDATED
     FULL_CONTAINER
 }
 
-enum ShipmentMode {
-    AIR_CARGO
-    SEA_CARGO
+enum ShipmentRoute {
+    NIGERIA_TO_ABROAD
+}
+
+enum ShipmentServiceOption {
+    WAREHOUSE
+    DROP_OFF
+}
+
+enum PickupType {
+    DOORSTEP_DELIVERY
+    WAREHOUSE_PICKUP
 }

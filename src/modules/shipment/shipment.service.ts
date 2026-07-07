@@ -7,7 +7,17 @@ import { CreateCorporateShipmentDto } from './dtos/create-corporate-shipment.dto
 import { CreateContainerDto } from './dtos/create-container.dto';
 import { CreateShipmentFromIntakeDto } from './dtos/create-shipment-from-intake.dto';
 import { PasswordHasher } from '../authentication/utils/PasswordHasher';
-import { ShipmentStatus, ShipmentType, Tier, Role, ContainerType, ContainerStatus, IntakeParcelStatus } from 'generated/prisma/enums';
+import {
+  ContainerStatus,
+  ContainerType,
+  IntakeParcelStatus,
+  Role,
+  ShipmentRoute,
+  ShipmentServiceOption,
+  ShipmentStatus,
+  ShipmentType,
+  Tier,
+} from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
 import { SmtpProvider } from 'src/common/providers/smtp.provider';
@@ -152,7 +162,34 @@ export class ShipmentService {
     });
   }
 
+  private resolveT1SenderName(dto: CreateT1ShipmentDto) {
+    const fullName = dto.senderFullName?.trim()
+      || `${dto.senderFirstName ?? ''} ${dto.senderLastName ?? ''}`.trim();
+
+    if (!fullName) {
+      throw new BadRequestException('Sender full name is required.');
+    }
+
+    const nameParts = fullName.split(/\s+/);
+    const firstName = dto.senderFirstName?.trim() || nameParts[0];
+    const lastName = dto.senderLastName?.trim() || nameParts.slice(1).join(' ');
+
+    return { fullName, firstName, lastName };
+  }
+
+  private resolveT1ShipmentType(dto: CreateT1ShipmentDto) {
+    return dto.shipmentType ?? ShipmentType.AIR_CARGO;
+  }
+
   async createT1Shipment(dto: CreateT1ShipmentDto) {
+    const senderName = this.resolveT1SenderName(dto);
+    const shipmentType = this.resolveT1ShipmentType(dto);
+    const receiverAddress = dto.receiverAddressLine1?.trim() || dto.receiverAddress?.trim();
+
+    if (!receiverAddress) {
+      throw new BadRequestException('Receiver address line 1 is required.');
+    }
+
     // 1. Search sender by email
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.senderEmail },
@@ -191,9 +228,10 @@ export class ShipmentService {
           referralCode,
           profile: {
             create: {
-              firstName: dto.senderFirstName,
-              lastName: dto.senderLastName,
+              firstName: senderName.firstName,
+              lastName: senderName.lastName,
               phone: dto.senderPhone,
+              address: dto.senderAddress,
             },
           },
         },
@@ -208,14 +246,32 @@ export class ShipmentService {
       data: {
         shipment_number: shipmentNumber,
         senderId: userId,
+        senderName: senderName.fullName,
+        senderPhone: dto.senderPhone,
+        senderEmail: dto.senderEmail,
+        senderAddress: dto.senderAddress,
+        senderCountry: dto.senderCountry ?? 'Nigeria',
         receiverName: dto.receiverName,
         receiverPhone: dto.receiverPhone,
-        receiverAddress: dto.receiverAddress,
+        receiverEmail: dto.receiverEmail,
+        receiverCountry: dto.receiverCountry,
+        receiverAddress,
+        receiverPostalCode: dto.receiverPostalCode,
         weight: dto.weight,
+        insurance: dto.insurance ?? false,
+        valueOfGoods: dto.valueOfGoods,
+        packageImageUrl: dto.packageImageUrl,
+        pickupType: dto.pickupType,
         hubId: dto.hubId,
         originHubId: dto.hubId,
         current_status: ShipmentStatus.AT_HUB,
-        type: ShipmentType.STANDARD,
+        shipmentType,
+        shipmentRoute: dto.shipmentRoute ?? ShipmentRoute.NIGERIA_TO_ABROAD,
+        shipmentService: dto.shipmentService ?? ShipmentServiceOption.DROP_OFF,
+        paymentServiceType: dto.paymentServiceType,
+        paymentCurrencyType: dto.paymentCurrencyType,
+        amountPayable: dto.amountPayable,
+        cost: dto.amountPayable ?? undefined,
         // Pickup scheduling ("send for someone else" feature)
         pickupContactName: dto.pickupContactName,
         pickupContactPhone: dto.pickupContactPhone,
@@ -245,7 +301,7 @@ export class ShipmentService {
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
               <h2 style="color: #1a73e8; text-align: center;">Welcome to Buan Logistics</h2>
-              <p>Hello <strong>${dto.senderFirstName} ${dto.senderLastName}</strong>,</p>
+              <p>Hello <strong>${senderName.fullName}</strong>,</p>
               <p>An account has been automatically created for you in our system following your shipment registration.</p>
               <p>Here are your temporary login details:</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f8f9fa; border-radius: 5px;">
@@ -272,7 +328,7 @@ export class ShipmentService {
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
               <h2 style="color: #1a73e8; text-align: center;">Shipment Registered Successfully</h2>
-              <p>Hello <strong>${dto.senderFirstName} ${dto.senderLastName}</strong>,</p>
+              <p>Hello <strong>${senderName.fullName}</strong>,</p>
               <p>Your shipment has been registered and is currently <strong>AT HUB</strong>.</p>
               <h3 style="color: #1a73e8; margin-top: 20px;">Shipment Information</h3>
               <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -286,7 +342,7 @@ export class ShipmentService {
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Address:</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverAddress}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${receiverAddress}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Weight:</td>
@@ -320,7 +376,7 @@ export class ShipmentService {
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Receiver Address:</td>
-                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${dto.receiverAddress}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${receiverAddress}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px; border-bottom: 1px solid #dee2e6; font-weight: bold;">Weight:</td>
@@ -383,7 +439,7 @@ export class ShipmentService {
         containerDetails: dto.containerDetails || {},
         branchId: dto.branchId,
         current_status: ShipmentStatus.PENDING,
-        type: dto.type,
+        shipmentType: dto.shipmentType,
         // Pickup scheduling ("send for someone else" feature)
         pickupContactName: dto.pickupContactName,
         pickupContactPhone: dto.pickupContactPhone,
@@ -458,7 +514,7 @@ export class ShipmentService {
         branchId: dto.branchId,
         current_status: ShipmentStatus.PENDING,
         tracking_number: trackingNumber,
-        type: dto.type,
+        shipmentType: dto.shipmentType,
       },
     });
 
@@ -613,8 +669,7 @@ export class ShipmentService {
           branchId,
           deliveryHubId: dto.deliveryHubId,
           current_status: ShipmentStatus.ARRIVED_AT_BRANCH,
-          type: dto.type ?? ShipmentType.STANDARD,
-          shipmentType: dto.shipmentType,
+          shipmentType: dto.shipmentType ?? ShipmentType.AIR_CARGO,
         },
       });
 

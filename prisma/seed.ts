@@ -18,7 +18,6 @@ import {
   ReferralStatus,
   RewardSource,
   RewardType,
-  ShipmentMode,
   ShipmentStatus,
   ShipmentType,
   Tier,
@@ -503,8 +502,7 @@ async function main() {
         shipped_at: now,
         delivered_at: now,
         current_status: ShipmentStatus.DELIVERED,
-        type: ShipmentType.EXPRESS,
-        shipmentType: ShipmentMode.AIR_CARGO,
+        shipmentType: ShipmentType.AIR_CARGO,
         pickupContactName: "Ada Lovelace",
         pickupContactPhone: "+2348000000000",
         pickupAddress: "12 Sample Drive",
@@ -531,8 +529,7 @@ async function main() {
         deliveryHubId: deliveryHub.id,
         cost: 45.5,
         current_status: ShipmentStatus.ARRIVED_AT_BRANCH,
-        type: ShipmentType.STANDARD,
-        shipmentType: ShipmentMode.SEA_CARGO,
+        shipmentType: ShipmentType.SEA_CARGO,
       },
     });
 

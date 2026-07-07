@@ -53,10 +53,10 @@ export class CreateT2T3ShipmentDto {
   @IsUUID()
   branchId: string;
 
-  @ApiProperty({ example: 'STANDARD' })
+  @ApiProperty({ example: 'AIR_CARGO', enum: ShipmentType })
   @IsNotEmpty()
   @IsEnum(ShipmentType)
-  type: ShipmentType;
+  shipmentType: ShipmentType;
 
   // ─── "Send for Someone Else" / Pickup Scheduling ─────────────────────────
 

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { InvoiceStatus, RewardSource, RewardType, ShipmentMode, ShipmentStatus, ShipmentType } from 'generated/prisma/enums';
+import { InvoiceStatus, RewardSource, RewardType, ShipmentStatus, ShipmentType } from 'generated/prisma/enums';
 import { PaginationQueryDto } from 'src/common/dtos/pagination-query.dto';
 import { PaginatedResponseDto } from 'src/common/dtos/paginated-response.dto';
 
@@ -25,7 +25,7 @@ export class RewardService {
       return existing;
     }
 
-    const rewardType = this.resolveRewardType(shipment.shipmentType, shipment.weight, shipment.type);
+    const rewardType = this.resolveRewardType(shipment.shipmentType, shipment.weight);
     const rewardRule = await this.getRewardRule(rewardType);
 
     if (!rewardRule || !rewardRule.isActive) {
@@ -353,11 +353,11 @@ export class RewardService {
     return this.prisma.rewardRule.findMany({ orderBy: { createdAt: 'asc' } });
   }
 
-  private resolveRewardType(shipmentType?: ShipmentMode | null, weight?: number | null, shipmentKind?: ShipmentType | null): RewardType {
-    if (shipmentType === ShipmentMode.AIR_CARGO) {
+  private resolveRewardType(shipmentType?: ShipmentType | null, weight?: number | null): RewardType {
+    if (shipmentType === ShipmentType.AIR_CARGO) {
       return RewardType.AIR_CARGO;
     }
-    if (shipmentType === ShipmentMode.SEA_CARGO) {
+    if (shipmentType === ShipmentType.SEA_CARGO) {
       return weight && weight >= 100 ? RewardType.KG_SHIPMENT : RewardType.SEA_CARGO;
     }
     return RewardType.KG_SHIPMENT;
@@ -367,7 +367,7 @@ export class RewardService {
     return this.prisma.rewardRule.findUnique({ where: { rewardType } });
   }
 
-  private async updateRewardProgress(userId: string, rewardType: RewardType, shipment: { weight: number; current_status: ShipmentStatus; shipmentType?: ShipmentMode | null }) {
+  private async updateRewardProgress(userId: string, rewardType: RewardType, shipment: { weight: number; current_status: ShipmentStatus; shipmentType?: ShipmentType | null }) {
     const rule = await this.getRewardRule(rewardType);
     if (!rule || !rule.isActive) {
       return;

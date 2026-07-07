@@ -1,0 +1,17 @@
+-- AlterTable
+ALTER TABLE "shipments" ADD COLUMN     "senderName" TEXT,
+ADD COLUMN     "senderPhone" TEXT,
+ADD COLUMN     "senderEmail" TEXT,
+ADD COLUMN     "senderAddress" TEXT,
+ADD COLUMN     "senderCountry" TEXT,
+ADD COLUMN     "receiverEmail" TEXT,
+ADD COLUMN     "receiverCountry" TEXT,
+ADD COLUMN     "receiverPostalCode" TEXT,
+ADD COLUMN     "insurance" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "valueOfGoods" TEXT,
+ADD COLUMN     "packageImageUrl" TEXT,
+ADD COLUMN     "pickupType" TEXT,
+ADD COLUMN     "shipmentService" TEXT,
+ADD COLUMN     "paymentServiceType" TEXT,
+ADD COLUMN     "paymentCurrencyType" TEXT,
+ADD COLUMN     "amountPayable" DOUBLE PRECISION;

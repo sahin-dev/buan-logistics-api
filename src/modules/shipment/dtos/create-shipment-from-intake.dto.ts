@@ -8,7 +8,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { ShipmentMode, ShipmentType } from 'generated/prisma/enums';
+import { ShipmentType } from 'generated/prisma/enums';
 
 export class CreateShipmentFromIntakeDto {
   @ApiProperty({ example: '+8801700000000' })
@@ -41,15 +41,10 @@ export class CreateShipmentFromIntakeDto {
   @IsNumber()
   cost?: number;
 
-  @ApiPropertyOptional({ example: 'STANDARD', enum: ShipmentType })
+  @ApiPropertyOptional({ example: 'AIR_CARGO', enum: ShipmentType })
   @IsOptional()
   @IsEnum(ShipmentType)
-  type?: ShipmentType;
-
-  @ApiPropertyOptional({ example: 'AIR_CARGO', enum: ShipmentMode })
-  @IsOptional()
-  @IsEnum(ShipmentMode)
-  shipmentType?: ShipmentMode;
+  shipmentType?: ShipmentType;
 
   @ApiPropertyOptional({ example: { width: 50, height: 40, depth: 30 } })
   @IsOptional()

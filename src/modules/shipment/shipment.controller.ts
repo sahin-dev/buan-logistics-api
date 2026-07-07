@@ -34,6 +34,7 @@ export class ShipmentController {
   @Roles(Role.HUB_PROIVDER, Role.ADMIN, Role.BRANCH)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Entry a regular customer (T1) shipment (Hub Provider / Admin / Branch Staff only)' })
+  @ApiBody({ type: CreateT1ShipmentDto })
   async createT1Shipment(@Body() dto: CreateT1ShipmentDto) {
     return this.shipmentService.createT1Shipment(dto);
   }
@@ -300,8 +301,7 @@ export class ShipmentController {
         receiverAddress: '123 Main St, City, State 12345',
         weight: 2.5,
         current_status: 'IN_TRANSIT',
-        type: 'STANDARD',
-        shipmentType: 'STANDARD',
+        shipmentType: 'AIR_CARGO',
         cost: 50.0,
         hubId: 'hub-uuid',
         branchId: 'branch-uuid',
